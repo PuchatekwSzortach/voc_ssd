@@ -5,7 +5,7 @@ set -e
 
 source activate voc_ssd_environment
 
-DIRECTORIES_TO_SCAN="tests"
+DIRECTORIES_TO_SCAN="net scripts tests"
 
 echo "Running pylint..."
 pylint $DIRECTORIES_TO_SCAN
