@@ -5,6 +5,8 @@ Module with various utilities
 import os
 import logging
 
+import cv2
+
 
 def get_logger(path):
     """
@@ -22,3 +24,20 @@ def get_logger(path):
     logger.addHandler(file_handler)
 
     return logger
+
+
+def get_image_with_bounding_boxes(image, bounding_boxes):
+    """
+    Get a copy of input image with bounding boxes drawn on it
+    :param image: numpy array
+    :param bounding_boxes: list of bounding boxes in [x_min, y_min, x_max, y_max] format
+    :return: numpy array
+    """
+
+    annotated_image = image.copy()
+
+    for box in bounding_boxes:
+
+        cv2.rectangle(annotated_image, (box[0], box[1]), (box[2], box[3]), color=(0, 255, 0), thickness=2)
+
+    return annotated_image

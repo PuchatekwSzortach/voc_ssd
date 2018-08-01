@@ -6,6 +6,7 @@ import os
 import copy
 import random
 
+import xmltodict
 import cv2
 
 
@@ -55,9 +56,28 @@ class VOCSamplesGeneratorFactory:
                 image_path = os.path.join(self.data_directory, "JPEGImages", image_filename + ".jpg")
                 image = cv2.imread(image_path)
 
-                # annotations_path = os.path.join(self.data_directory, "Annotations", image_filename + ".xml")
-                # print(annotations_path)
-                bounding_boxes = [[100, 100, 200, 200]]
+                annotations_path = os.path.join(self.data_directory, "Annotations", image_filename + ".xml")
+
+                with open(annotations_path) as file:
+
+                    annotations = xmltodict.parse(file.read())
+                    objects_annotations = annotations["annotation"]["object"]
+
+                # If image contains only a single object, single annotations["annotation"]["object"] returns
+                # a single OrderedDictionary. For multiple objects it returns a list of OrderedDictonaries.
+                # We will wrap a single object into a list with a single element for uniform treatment
+                if not isinstance(objects_annotations, list):
+                    objects_annotations = [objects_annotations]
+
+                bounding_boxes = []
+
+                for object_annotations in objects_annotations:
+
+                    bounding_box = [
+                        int(object_annotations["bndbox"]["xmin"]), int(object_annotations["bndbox"]["ymin"]),
+                        int(object_annotations["bndbox"]["xmax"]), int(object_annotations["bndbox"]["ymax"])]
+
+                    bounding_boxes.append(bounding_box)
 
                 yield image, bounding_boxes
 
