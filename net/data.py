@@ -70,6 +70,7 @@ class VOCSamplesGeneratorFactory:
                     objects_annotations = [objects_annotations]
 
                 bounding_boxes = []
+                categories = []
 
                 for object_annotations in objects_annotations:
 
@@ -79,7 +80,9 @@ class VOCSamplesGeneratorFactory:
 
                     bounding_boxes.append(bounding_box)
 
-                yield image, bounding_boxes
+                    categories.append(object_annotations["name"])
+
+                yield image, bounding_boxes, categories
 
     def get_size(self):
         """

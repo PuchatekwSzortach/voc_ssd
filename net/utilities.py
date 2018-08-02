@@ -5,6 +5,7 @@ Module with various utilities
 import os
 import logging
 
+import numpy as np
 import cv2
 
 
@@ -26,12 +27,68 @@ def get_logger(path):
     return logger
 
 
+def get_ids_to_colors_map(categories_count):
+    """
+    Given a categories count, get categories ids to colors dictionary. Colors are computed as a function of
+    category index.
+    All colors are returned in BGR order.
+    Code adapted from https://gist.github.com/wllhf/a4533e0adebe57e3ed06d4b50c8419ae
+    :param categories_count: number of categories
+    :return: map {int: tuple}
+    """
+
+    colors_count = 256
+
+    def bitget(byte_value, idx):
+        """
+        Check if bit at given byte index is set
+        :param byte_value: byte
+        :param idx: index
+        :return: bool
+        """
+        return (byte_value & (1 << idx)) != 0
+
+    colors_matrix = np.zeros(shape=(colors_count, 3), dtype=np.int)
+
+    for color_index in range(colors_count):
+
+        red = green = blue = 0
+        color = color_index
+
+        for j in range(8):
+
+            red = red | (bitget(color, 0) << 7 - j)
+            green = green | (bitget(color, 1) << 7 - j)
+            blue = blue | (bitget(color, 2) << 7 - j)
+            color = color >> 3
+
+        # Writing colors in BGR order
+        colors_matrix[color_index] = blue, green, red
+
+    # Return category index to colors map, make sure to convert each color from numpy array to plain list
+    return {category_index: colors_matrix[category_index].tolist() for category_index in range(categories_count)}
+
+
+def get_categories_to_colors_map(categories):
+    """
+    Given a list of categories, get categories to colors dictionary. Colors are computed as a function of
+    category index.
+    All colors are returned in BGR order.
+    Code adapted from https://gist.github.com/wllhf/a4533e0adebe57e3ed06d4b50c8419ae
+    :param categories: list of strings
+    :return: map {string: tuple}
+    """
+
+    ids_to_colors_map = get_ids_to_colors_map(len(categories))
+    return {categories[index]: ids_to_colors_map[index] for index in range(len(categories))}
+
+
 def get_image_with_bounding_boxes(image, bounding_boxes):
     """
     Get a copy of input image with bounding boxes drawn on it
     :param image: numpy array
     :param bounding_boxes: list of bounding boxes in [x_min, y_min, x_max, y_max] format
-    :return: numpy array
+    :return: numpy array, an annotated image
     """
 
     annotated_image = image.copy()
@@ -39,5 +96,27 @@ def get_image_with_bounding_boxes(image, bounding_boxes):
     for box in bounding_boxes:
 
         cv2.rectangle(annotated_image, (box[0], box[1]), (box[2], box[3]), color=(0, 255, 0), thickness=2)
+
+    return annotated_image
+
+
+def get_image_with_voc_bounding_boxes(image, bounding_boxes, categories, categories_to_colors_map):
+    """
+    Get a copy of input image with bounding boxes drawn on it. Colors of bounding boxes are selected per
+    unique per category.
+    :param image: numpy array
+    :param bounding_boxes: list of bounding boxes in [x_min, y_min, x_max, y_max] format
+    :param categories: list of categories - one for each bounding box
+    :param categories_to_colors_map: categories to colors map
+    :return: numpy array, an annotated image
+    """
+
+    annotated_image = image.copy()
+
+    for box, category in zip(bounding_boxes, categories):
+
+        cv2.rectangle(
+            annotated_image, (box[0], box[1]), (box[2], box[3]),
+            color=categories_to_colors_map[category], thickness=3)
 
     return annotated_image
