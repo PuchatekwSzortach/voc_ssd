@@ -21,10 +21,16 @@ def log_voc_samples_generator_output(logger, config):
     generator = net.data.VOCSamplesGeneratorFactory(
         config["voc"]["data_directory"], config["voc"]["validation_set_path"]).get_generator()
 
-    for _ in tqdm.tqdm(range(5)):
+    categories_to_colors_map = net.utilities.get_categories_to_colors_map(config["categories"])
 
-        image, _ = next(generator)
-        logger.info(vlogging.VisualRecord("Data", [image]))
+    for _ in tqdm.tqdm(range(10)):
+
+        image, bounding_boxes, categories = next(generator)
+
+        image = net.utilities.get_image_with_voc_bounding_boxes(
+            image, bounding_boxes, categories, categories_to_colors_map)
+
+        logger.info(vlogging.VisualRecord("Data", [image], str(categories)))
 
 
 def main():
