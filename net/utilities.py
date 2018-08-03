@@ -6,6 +6,9 @@ import os
 import logging
 
 import numpy as np
+import PIL.ImageDraw
+import PIL.ImageFont
+import PIL.Image
 import cv2
 
 
@@ -100,14 +103,42 @@ def get_image_with_bounding_boxes(image, bounding_boxes):
     return annotated_image
 
 
-def get_image_with_voc_bounding_boxes(image, bounding_boxes, categories, categories_to_colors_map):
+def draw_bounding_box_label(pil_image, bounding_box, label, color, font):
+    """
+    Draw bounding box label on an image
+    :param pil_image: PIL.Image object
+    :param bounding_box: bounding box in format [x_min, y_min, x_max, y_max]
+    :param label: text to draw
+    :param color: color to use for label background
+    :param font: PIL.ImageFont object
+    """
+
+    draw_manager = PIL.ImageDraw.Draw(pil_image)
+
+    text_size = draw_manager.textsize(label, font)
+
+    box_left = int(max(0, np.floor(bounding_box[0] + 0.5)))
+    box_top = int(max(0, np.floor(bounding_box[1] + 0.5)))
+
+    text_origin = [box_left, box_top - text_size[1]] \
+        if box_top - text_size[1] >= 0 else [box_left, box_top + 1]
+
+    text_end = text_origin[0] + text_size[0], text_origin[1] + text_size[1]
+    text_box = text_origin[0], text_origin[1], text_end[0], text_end[1]
+
+    draw_manager.rectangle(text_box, fill=tuple(color))
+    draw_manager.text(text_origin, label, fill=(255, 255, 255), font=font)
+
+
+def get_annotated_image(image, bounding_boxes, categories, categories_to_colors_map, font_path):
     """
     Get a copy of input image with bounding boxes drawn on it. Colors of bounding boxes are selected per
-    unique per category.
+    unique per category and each bounding box includes a label stating its category.
     :param image: numpy array
     :param bounding_boxes: list of bounding boxes in [x_min, y_min, x_max, y_max] format
     :param categories: list of categories - one for each bounding box
     :param categories_to_colors_map: categories to colors map
+    :param font_path: path to font file
     :return: numpy array, an annotated image
     """
 
@@ -119,4 +150,12 @@ def get_image_with_voc_bounding_boxes(image, bounding_boxes, categories, categor
             annotated_image, (box[0], box[1]), (box[2], box[3]),
             color=categories_to_colors_map[category], thickness=3)
 
-    return annotated_image
+    pil_image = PIL.Image.fromarray(annotated_image)
+
+    font = PIL.ImageFont.truetype(font_path, size=20)
+
+    for bounding_box, category in zip(bounding_boxes, categories):
+
+        draw_bounding_box_label(pil_image, bounding_box, category, categories_to_colors_map[category], font)
+
+    return np.array(pil_image)
