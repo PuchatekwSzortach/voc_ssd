@@ -27,8 +27,8 @@ def log_voc_samples_generator_output(logger, config):
 
         image, bounding_boxes, categories = next(generator)
 
-        image = net.utilities.get_image_with_voc_bounding_boxes(
-            image, bounding_boxes, categories, categories_to_colors_map)
+        image = net.utilities.get_annotated_image(
+            image, bounding_boxes, categories, categories_to_colors_map, config["font_path"])
 
         logger.info(vlogging.VisualRecord("Data", [image], str(categories)))
 
