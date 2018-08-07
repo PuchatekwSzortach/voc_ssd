@@ -4,12 +4,17 @@ Module with various utilities
 
 import os
 import logging
+import collections
 
 import numpy as np
 import PIL.ImageDraw
 import PIL.ImageFont
 import PIL.Image
 import cv2
+
+
+# A simple class for bundling bounding box and category of an object
+Annotation = collections.namedtuple('Annotation', 'bounding_box category')
 
 
 def get_logger(path):
@@ -130,13 +135,12 @@ def draw_bounding_box_label(pil_image, bounding_box, label, color, font):
     draw_manager.text(text_origin, label, fill=(255, 255, 255), font=font)
 
 
-def get_annotated_image(image, bounding_boxes, categories, categories_to_colors_map, font_path):
+def get_annotated_image(image, annotations, categories_to_colors_map, font_path):
     """
     Get a copy of input image with bounding boxes drawn on it. Colors of bounding boxes are selected per
     unique per category and each bounding box includes a label stating its category.
     :param image: numpy array
-    :param bounding_boxes: list of bounding boxes in [x_min, y_min, x_max, y_max] format
-    :param categories: list of categories - one for each bounding box
+    :param annotations: list of net.utilities.Annotation object
     :param categories_to_colors_map: categories to colors map
     :param font_path: path to font file
     :return: numpy array, an annotated image
@@ -144,18 +148,22 @@ def get_annotated_image(image, bounding_boxes, categories, categories_to_colors_
 
     annotated_image = image.copy()
 
-    for box, category in zip(bounding_boxes, categories):
+    for annotation in annotations:
+
+        box = annotation.bounding_box
 
         cv2.rectangle(
             annotated_image, (box[0], box[1]), (box[2], box[3]),
-            color=categories_to_colors_map[category], thickness=3)
+            color=categories_to_colors_map[annotation.category], thickness=3)
 
     pil_image = PIL.Image.fromarray(annotated_image)
 
     font = PIL.ImageFont.truetype(font_path, size=20)
 
-    for bounding_box, category in zip(bounding_boxes, categories):
+    for annotation in annotations:
 
-        draw_bounding_box_label(pil_image, bounding_box, category, categories_to_colors_map[category], font)
+        draw_bounding_box_label(
+            pil_image, annotation.bounding_box, annotation.category,
+            categories_to_colors_map[annotation.category], font)
 
     return np.array(pil_image)

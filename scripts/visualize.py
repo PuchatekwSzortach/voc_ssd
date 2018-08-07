@@ -25,12 +25,15 @@ def log_voc_samples_generator_output(logger, config):
 
     for _ in tqdm.tqdm(range(10)):
 
-        image, bounding_boxes, categories = next(generator)
+        image, annotations = next(generator)
 
         image = net.utilities.get_annotated_image(
-            image, bounding_boxes, categories, categories_to_colors_map, config["font_path"])
+            image, annotations, categories_to_colors_map, config["font_path"])
 
-        logger.info(vlogging.VisualRecord("Data", [image], str(categories)))
+        categories = [annotation.category for annotation in annotations]
+        message = "{} - {}".format(image.shape[:2], categories)
+
+        logger.info(vlogging.VisualRecord("Data", [image], message))
 
 
 def main():
