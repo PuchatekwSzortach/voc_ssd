@@ -4,7 +4,6 @@ Module with various utilities
 
 import os
 import logging
-import collections
 
 import numpy as np
 import PIL.ImageDraw
@@ -13,8 +12,15 @@ import PIL.Image
 import cv2
 
 
-# A simple class for bundling bounding box and category of an object
-Annotation = collections.namedtuple('Annotation', 'bounding_box category')
+class Annotation:
+    """
+    A simple class for bundling bounding box and category of an object
+    """
+
+    def __init__(self, bounding_box, label):
+
+        self.bounding_box = bounding_box
+        self.label = label
 
 
 def get_logger(path):
@@ -108,22 +114,21 @@ def get_image_with_bounding_boxes(image, bounding_boxes):
     return annotated_image
 
 
-def draw_bounding_box_label(pil_image, bounding_box, label, color, font):
+def draw_annotation_label(pil_image, annotation, color, font):
     """
-    Draw bounding box label on an image
+    Draw annotation label on an image
     :param pil_image: PIL.Image object
-    :param bounding_box: bounding box in format [x_min, y_min, x_max, y_max]
-    :param label: text to draw
+    :param annotation: net.utilities.Annotation instance
     :param color: color to use for label background
     :param font: PIL.ImageFont object
     """
 
     draw_manager = PIL.ImageDraw.Draw(pil_image)
 
-    text_size = draw_manager.textsize(label, font)
+    text_size = draw_manager.textsize(annotation.label, font)
 
-    box_left = int(max(0, np.floor(bounding_box[0] + 0.5)))
-    box_top = int(max(0, np.floor(bounding_box[1] + 0.5)))
+    box_left = int(max(0, np.floor(annotation.bounding_box[0] + 0.5)))
+    box_top = int(max(0, np.floor(annotation.bounding_box[1] + 0.5)))
 
     text_origin = [box_left, box_top - text_size[1]] \
         if box_top - text_size[1] >= 0 else [box_left, box_top + 1]
@@ -132,38 +137,66 @@ def draw_bounding_box_label(pil_image, bounding_box, label, color, font):
     text_box = text_origin[0], text_origin[1], text_end[0], text_end[1]
 
     draw_manager.rectangle(text_box, fill=tuple(color))
-    draw_manager.text(text_origin, label, fill=(255, 255, 255), font=font)
+    draw_manager.text(text_origin, annotation.label, fill=(255, 255, 255), font=font)
 
 
-def get_annotated_image(image, annotations, categories_to_colors_map, font_path):
+def get_annotated_image(image, annotations, colors, font_path):
     """
     Get a copy of input image with bounding boxes drawn on it. Colors of bounding boxes are selected per
     unique per category and each bounding box includes a label stating its category.
     :param image: numpy array
     :param annotations: list of net.utilities.Annotation object
-    :param categories_to_colors_map: categories to colors map
+    :param colors: list of colors to be used for each annotation
     :param font_path: path to font file
     :return: numpy array, an annotated image
     """
 
     annotated_image = image.copy()
 
-    for annotation in annotations:
+    for annotation, color in zip(annotations, colors):
 
         box = annotation.bounding_box
 
-        cv2.rectangle(
-            annotated_image, (box[0], box[1]), (box[2], box[3]),
-            color=categories_to_colors_map[annotation.category], thickness=3)
+        cv2.rectangle(annotated_image, (box[0], box[1]), (box[2], box[3]), color=color, thickness=3)
 
     pil_image = PIL.Image.fromarray(annotated_image)
 
     font = PIL.ImageFont.truetype(font_path, size=20)
 
-    for annotation in annotations:
+    for annotation, color in zip(annotations, colors):
 
-        draw_bounding_box_label(
-            pil_image, annotation.bounding_box, annotation.category,
-            categories_to_colors_map[annotation.category], font)
+        draw_annotation_label(pil_image, annotation, color, font)
 
     return np.array(pil_image)
+
+
+def get_resized_sample(image, bounding_boxes, size_factor):
+    """
+    Resize image and its annotations so that image is a multiple of factor
+    :param image: numpy array
+    :param bounding_boxes: list bounding boxes in corner format
+    :param size_factor: int, value a multiple of which we want image to be
+    :return: tuple (resized_image, resized_annotations)
+    """
+
+    target_x_size = size_factor * (image.shape[1] // size_factor)
+    target_y_size = size_factor * (image.shape[0] // size_factor)
+
+    resized_image = cv2.resize(image, (target_x_size, target_y_size))
+
+    x_resize_fraction = target_x_size / image.shape[1]
+    y_resize_fraction = target_y_size / image.shape[0]
+
+    resized_bounding_boxes = []
+
+    for bounding_box in bounding_boxes:
+
+        x_min, y_min, x_max, y_max = bounding_box
+
+        resized_bounding_box = \
+            round(x_min * x_resize_fraction), round(y_min * y_resize_fraction), \
+            round(x_max * x_resize_fraction), round(y_max * y_resize_fraction)
+
+        resized_bounding_boxes.append(resized_bounding_box)
+
+    return resized_image, resized_bounding_boxes

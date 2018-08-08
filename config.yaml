@@ -29,3 +29,6 @@ categories:
     'tvmonitor']
 
 font_path: "/Library/Fonts/Arial.ttf"
+
+# Size factor to which images should be rescaled
+size_factor: 32

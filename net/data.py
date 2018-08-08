@@ -51,7 +51,7 @@ def get_annotations(annotations_path):
             int(xml_annotation["bndbox"]["xmin"]), int(xml_annotation["bndbox"]["ymin"]),
             int(xml_annotation["bndbox"]["xmax"]), int(xml_annotation["bndbox"]["ymax"])]
 
-        annotation = net.utilities.Annotation(bounding_box=bounding_box, category=xml_annotation["name"])
+        annotation = net.utilities.Annotation(bounding_box=bounding_box, label=xml_annotation["name"])
         annotations.append(annotation)
 
     return annotations
@@ -62,16 +62,18 @@ class VOCSamplesGeneratorFactory:
     Factory class creating data batches generators that yield (image, bounding boxes) pairs
     """
 
-    def __init__(self, data_directory, data_set_path):
+    def __init__(self, data_directory, data_set_path, size_factor):
         """
         Constructor
         :param data_directory: path to VOC dataset directory
         :param data_set_path: path to file listing images to be used - for selecting between train and validation
+        :param size_factor: size factor to which images should be rescaled
         data sets
         """
 
         self.data_directory = data_directory
         self.images_filenames = get_dataset_filenames(data_directory, data_set_path)
+        self.size_factor = size_factor
 
     def get_generator(self):
         """
@@ -92,6 +94,14 @@ class VOCSamplesGeneratorFactory:
 
                 annotations_path = os.path.join(self.data_directory, "Annotations", image_filename + ".xml")
                 annotations = get_annotations(annotations_path)
+
+                bounding_boxes = [annotation.bounding_box for annotation in annotations]
+
+                image, resized_bounding_boxes = net.utilities.get_resized_sample(
+                    image, bounding_boxes, size_factor=self.size_factor)
+
+                for index, bounding_box in enumerate(resized_bounding_boxes):
+                    annotations[index].bounding_box = bounding_box
 
                 yield image, annotations
 
