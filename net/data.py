@@ -9,6 +9,8 @@ import random
 import xmltodict
 import cv2
 
+import net.utilities
+
 
 def get_dataset_filenames(data_directory, data_set_path):
     """
@@ -23,25 +25,59 @@ def get_dataset_filenames(data_directory, data_set_path):
         return [line.strip() for line in file.readlines()]
 
 
+def get_annotations(annotations_path):
+    """
+    Given path to image annotations, return a list of annotations for that image
+    :param annotations_path: path to annotations xml
+    :return: list of net.utility.Annotation objects
+    """
+
+    with open(annotations_path) as file:
+
+        annotations = xmltodict.parse(file.read())
+        xml_annotations = annotations["annotation"]["object"]
+
+    # If image contains only a single object, annotations["annotation"]["object"] returns
+    # a single OrderedDictionary. For multiple objects it returns a list of OrderedDictonaries.
+    # We will wrap a single object into a list with a single element for uniform treatment
+    if not isinstance(xml_annotations, list):
+        xml_annotations = [xml_annotations]
+
+    annotations = []
+
+    for xml_annotation in xml_annotations:
+
+        bounding_box = [
+            int(xml_annotation["bndbox"]["xmin"]), int(xml_annotation["bndbox"]["ymin"]),
+            int(xml_annotation["bndbox"]["xmax"]), int(xml_annotation["bndbox"]["ymax"])]
+
+        annotation = net.utilities.Annotation(bounding_box=bounding_box, label=xml_annotation["name"])
+        annotations.append(annotation)
+
+    return annotations
+
+
 class VOCSamplesGeneratorFactory:
     """
     Factory class creating data batches generators that yield (image, bounding boxes) pairs
     """
 
-    def __init__(self, data_directory, data_set_path):
+    def __init__(self, data_directory, data_set_path, size_factor):
         """
         Constructor
         :param data_directory: path to VOC dataset directory
         :param data_set_path: path to file listing images to be used - for selecting between train and validation
+        :param size_factor: size factor to which images should be rescaled
         data sets
         """
 
         self.data_directory = data_directory
         self.images_filenames = get_dataset_filenames(data_directory, data_set_path)
+        self.size_factor = size_factor
 
     def get_generator(self):
         """
-        Returns generator that yields samples (image, bounding boxes)
+        Returns generator that yields samples (image, annotations)
         :return: generator
         """
 
@@ -57,32 +93,17 @@ class VOCSamplesGeneratorFactory:
                 image = cv2.imread(image_path)
 
                 annotations_path = os.path.join(self.data_directory, "Annotations", image_filename + ".xml")
+                annotations = get_annotations(annotations_path)
 
-                with open(annotations_path) as file:
+                bounding_boxes = [annotation.bounding_box for annotation in annotations]
 
-                    annotations = xmltodict.parse(file.read())
-                    objects_annotations = annotations["annotation"]["object"]
+                image, resized_bounding_boxes = net.utilities.get_resized_sample(
+                    image, bounding_boxes, size_factor=self.size_factor)
 
-                # If image contains only a single object, single annotations["annotation"]["object"] returns
-                # a single OrderedDictionary. For multiple objects it returns a list of OrderedDictonaries.
-                # We will wrap a single object into a list with a single element for uniform treatment
-                if not isinstance(objects_annotations, list):
-                    objects_annotations = [objects_annotations]
+                for index, bounding_box in enumerate(resized_bounding_boxes):
+                    annotations[index].bounding_box = bounding_box
 
-                bounding_boxes = []
-                categories = []
-
-                for object_annotations in objects_annotations:
-
-                    bounding_box = [
-                        int(object_annotations["bndbox"]["xmin"]), int(object_annotations["bndbox"]["ymin"]),
-                        int(object_annotations["bndbox"]["xmax"]), int(object_annotations["bndbox"]["ymax"])]
-
-                    bounding_boxes.append(bounding_box)
-
-                    categories.append(object_annotations["name"])
-
-                yield image, bounding_boxes, categories
+                yield image, annotations
 
     def get_size(self):
         """

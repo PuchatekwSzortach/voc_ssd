@@ -19,18 +19,23 @@ def log_voc_samples_generator_output(logger, config):
     """
 
     generator = net.data.VOCSamplesGeneratorFactory(
-        config["voc"]["data_directory"], config["voc"]["validation_set_path"]).get_generator()
+        config["voc"]["data_directory"], config["voc"]["validation_set_path"], config["size_factor"]).get_generator()
 
     categories_to_colors_map = net.utilities.get_categories_to_colors_map(config["categories"])
 
     for _ in tqdm.tqdm(range(10)):
 
-        image, bounding_boxes, categories = next(generator)
+        image, annotations = next(generator)
+
+        colors = [categories_to_colors_map[annotation.label] for annotation in annotations]
 
         image = net.utilities.get_annotated_image(
-            image, bounding_boxes, categories, categories_to_colors_map, config["font_path"])
+            image, annotations, colors, config["font_path"])
 
-        logger.info(vlogging.VisualRecord("Data", [image], str(categories)))
+        labels = [annotation.label for annotation in annotations]
+        message = "{} - {}".format(image.shape[:2], labels)
+
+        logger.info(vlogging.VisualRecord("Data", [image], message))
 
 
 def main():
