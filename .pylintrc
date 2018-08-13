@@ -130,7 +130,8 @@ disable=print-statement,
         unused-argument,
         duplicate-code,
         stop-iteration-return,
-        len-as-condition
+        len-as-condition,
+        unbalanced-tuple-unpacking
 
 # Enable the message, report, category or checker with the given id(s). You can
 # either give multiple identifier separated by comma (,) or put this option

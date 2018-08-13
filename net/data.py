@@ -25,33 +25,31 @@ def get_dataset_filenames(data_directory, data_set_path):
         return [line.strip() for line in file.readlines()]
 
 
-def get_annotations(annotations_path):
+def get_objects_annotations(image_annotations):
     """
-    Given path to image annotations, return a list of annotations for that image
-    :param annotations_path: path to annotations xml
+    Given an image annotations object, return a list of objects annotations
+    :param image_annotations: dictionary with image annotations
     :return: list of net.utility.Annotation objects
     """
 
-    with open(annotations_path) as file:
+    # raw_objects_annotations is a dictionary or a list of dictionaries
+    raw_objects_annotations = image_annotations["annotation"]["object"]
 
-        annotations = xmltodict.parse(file.read())
-        xml_annotations = annotations["annotation"]["object"]
-
-    # If image contains only a single object, annotations["annotation"]["object"] returns
+    # If image contains only a single object, raw_objects_annotations["annotation"]["object"] returns
     # a single OrderedDictionary. For multiple objects it returns a list of OrderedDictonaries.
     # We will wrap a single object into a list with a single element for uniform treatment
-    if not isinstance(xml_annotations, list):
-        xml_annotations = [xml_annotations]
+    if not isinstance(raw_objects_annotations, list):
+        raw_objects_annotations = [raw_objects_annotations]
 
     annotations = []
 
-    for xml_annotation in xml_annotations:
+    for raw_object_annotation in raw_objects_annotations:
 
         bounding_box = [
-            int(xml_annotation["bndbox"]["xmin"]), int(xml_annotation["bndbox"]["ymin"]),
-            int(xml_annotation["bndbox"]["xmax"]), int(xml_annotation["bndbox"]["ymax"])]
+            int(raw_object_annotation["bndbox"]["xmin"]), int(raw_object_annotation["bndbox"]["ymin"]),
+            int(raw_object_annotation["bndbox"]["xmax"]), int(raw_object_annotation["bndbox"]["ymax"])]
 
-        annotation = net.utilities.Annotation(bounding_box=bounding_box, label=xml_annotation["name"])
+        annotation = net.utilities.Annotation(bounding_box=bounding_box, label=raw_object_annotation["name"])
         annotations.append(annotation)
 
     return annotations
@@ -93,17 +91,22 @@ class VOCSamplesGeneratorFactory:
                 image = cv2.imread(image_path)
 
                 annotations_path = os.path.join(self.data_directory, "Annotations", image_filename + ".xml")
-                annotations = get_annotations(annotations_path)
 
-                bounding_boxes = [annotation.bounding_box for annotation in annotations]
+                with open(annotations_path) as file:
+
+                    image_annotations = xmltodict.parse(file.read())
+
+                objects_annotations = get_objects_annotations(image_annotations)
+
+                bounding_boxes = [annotation.bounding_box for annotation in objects_annotations]
 
                 image, resized_bounding_boxes = net.utilities.get_resized_sample(
                     image, bounding_boxes, size_factor=self.size_factor)
 
                 for index, bounding_box in enumerate(resized_bounding_boxes):
-                    annotations[index].bounding_box = bounding_box
+                    objects_annotations[index].bounding_box = bounding_box
 
-                yield image, annotations
+                yield image, objects_annotations
 
     def get_size(self):
         """

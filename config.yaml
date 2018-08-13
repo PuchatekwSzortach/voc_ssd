@@ -2,6 +2,7 @@ voc:
   data_directory: "../../data/VOC2012"
   train_set_path: "ImageSets/Main/train.txt"
   validation_set_path: "ImageSets/Main/val.txt"
+  train_and_validation_set_path: "ImageSets/Main/trainval.txt"
 
 log_path: "/tmp/voc_ssd.html"
 
