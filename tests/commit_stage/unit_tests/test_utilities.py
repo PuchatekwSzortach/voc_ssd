@@ -7,6 +7,20 @@ import numpy as np
 import net.utilities
 
 
+def test_get_target_size():
+    """
+    Test get_target_image_size for a sample input
+    """
+
+    image_size = 100, 200
+    size_factor = 32
+
+    expected = 96, 192
+    actual = net.utilities.get_target_shape(image_size, size_factor)
+
+    assert expected == actual
+
+
 def test_get_resized_sample_input_is_already_a_multiple_of_desired_factor():
     """
     Test for net.utilities.get_resized_sample(), checks input isn't changed when it already is a multiple

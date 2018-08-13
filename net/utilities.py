@@ -170,6 +170,25 @@ def get_annotated_image(image, annotations, colors, font_path):
     return np.array(pil_image)
 
 
+def get_target_shape(shape, size_factor):
+    """
+    Given an shape tuple and size_factor, return a new shape tuple such that each of its dimensions
+    is a multiple of size_factor, rounding down
+    :param shape: tuple of integers
+    :param size_factor: integer
+    :return: tuple of integers
+    """
+
+    target_shape = []
+
+    for dimension in shape:
+
+        target_dimension = size_factor * (dimension // size_factor)
+        target_shape.append(target_dimension)
+
+    return tuple(target_shape)
+
+
 def get_resized_sample(image, bounding_boxes, size_factor):
     """
     Resize image and its annotations so that image is a multiple of factor
@@ -179,8 +198,7 @@ def get_resized_sample(image, bounding_boxes, size_factor):
     :return: tuple (resized_image, resized_annotations)
     """
 
-    target_x_size = size_factor * (image.shape[1] // size_factor)
-    target_y_size = size_factor * (image.shape[0] // size_factor)
+    target_y_size, target_x_size = get_target_shape(image.shape[:2], size_factor)
 
     resized_image = cv2.resize(image, (target_x_size, target_y_size))
 
