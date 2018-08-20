@@ -22,6 +22,30 @@ class Annotation:
         self.bounding_box = bounding_box
         self.label = label
 
+    @property
+    def width(self):
+        """
+        Width of annotation's bounding box
+        :return:
+        """
+        return self.bounding_box[2] - self.bounding_box[0]
+
+    @property
+    def height(self):
+        """
+        Height of annotation's bounding box
+        :return:
+        """
+        return self.bounding_box[3] - self.bounding_box[1]
+
+    @property
+    def aspect_ratio(self):
+        """
+        Aspect ratio of annotation's bounding box
+        :return:
+        """
+        return self.width / self.height
+
 
 def get_logger(path):
     """
@@ -173,7 +197,7 @@ def get_annotated_image(image, annotations, colors, font_path):
 def get_target_shape(shape, size_factor):
     """
     Given an shape tuple and size_factor, return a new shape tuple such that each of its dimensions
-    is a multiple of size_factor, rounding down
+    is a multiple of size_factor
     :param shape: tuple of integers
     :param size_factor: integer
     :return: tuple of integers
@@ -183,7 +207,15 @@ def get_target_shape(shape, size_factor):
 
     for dimension in shape:
 
-        target_dimension = size_factor * (dimension // size_factor)
+        rounded_down_dimension = size_factor * (dimension // size_factor)
+        rounded_up_dimension = rounded_down_dimension + size_factor
+
+        rounded_down_difference = abs(dimension - rounded_down_dimension)
+        rounded_up_difference = abs(dimension - rounded_up_dimension)
+
+        target_dimension = \
+            rounded_down_dimension if rounded_down_difference <= rounded_up_difference else rounded_up_dimension
+
         target_shape.append(target_dimension)
 
     return tuple(target_shape)
@@ -218,3 +250,27 @@ def get_resized_sample(image, bounding_boxes, size_factor):
         resized_bounding_boxes.append(resized_bounding_box)
 
     return resized_image, resized_bounding_boxes
+
+
+def is_annotation_size_unusual(annotation, min_size, min_aspect_ratio, max_aspect_ratio):
+    """
+    Checks if object described by annotation has unusual size - is too small or has unusual aspect ratio
+    :param annotation: net.utilities.Annotation instance
+    :param min_size: int, minimum size object must have to be considered normal
+    :param min_aspect_ratio: float, minimum aspect ratio object must have to be considered normal.
+    Both width to height and height to width ratios are tested against this criterion
+    :param max_aspect_ratio: float, maximum aspect ratio object must have to be considered normal.
+    Both width to height and height to width ratios are tested against this criterion
+    :return: bool, True if object size is unusual, False otherwise
+    """
+
+    if annotation.width < min_size or annotation.height < min_size:
+        return True
+
+    if annotation.aspect_ratio < min_aspect_ratio or 1 / annotation.aspect_ratio < min_aspect_ratio:
+        return True
+
+    if annotation.aspect_ratio > max_aspect_ratio or 1 / annotation.aspect_ratio > max_aspect_ratio:
+        return True
+
+    return False
