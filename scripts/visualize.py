@@ -92,7 +92,10 @@ def log_samples_with_odd_sized_annotations(logger, config):
         for annotation in annotations:
 
             if net.utilities.is_annotation_size_unusual(
-                    annotation, min_size=10, min_aspect_ratio=0.1, max_aspect_ratio=10):
+                    annotation,
+                    config["objects_filtering"]["minimum_size"],
+                    config["objects_filtering"]["minimum_aspect_ratio"],
+                    config["objects_filtering"]["maximum_aspect_ratio"]):
 
                 unusual_sized_annotations.append(annotation)
 

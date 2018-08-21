@@ -29,7 +29,12 @@ categories:
     'train',
     'tvmonitor']
 
-font_path: "/Library/Fonts/Arial.ttf"
+font_path: "/usr/share/fonts/truetype/msttcorefonts/arial.ttf"
 
 # Size factor to which images should be rescaled
 size_factor: 32
+
+objects_filtering:
+  minimum_size: 10
+  minimum_aspect_ratio: 0.1
+  maximum_aspect_ratio: 10
