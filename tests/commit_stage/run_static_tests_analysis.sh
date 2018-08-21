@@ -3,7 +3,8 @@
 # Exit on error
 set -e
 
-source activate voc_ssd_environment
+source $HOME/anaconda3/etc/profile.d/conda.sh
+conda activate voc_ssd_environment
 
 DIRECTORIES_TO_SCAN="net scripts tests"
 
