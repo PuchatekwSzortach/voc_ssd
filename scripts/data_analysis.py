@@ -46,45 +46,6 @@ def analyze_images_sizes(config):
         print("{} -> {}".format(count, size))
 
 
-def get_adjusted_object_sizes(image_annotations, size_factor):
-    """
-    Given image annotations dictionary and size factor,
-    return list of object sizes adjusted to a multiple of size factor
-    :param image_annotations: dictionary with image annotations
-    :param size_factor: integer, factor a multiple of which sizes should be adjusted to
-    :return: list of (object height, object width) tuples
-    """
-
-    objects_annotations = net.data.get_objects_annotations(image_annotations)
-
-    image_size = \
-        int(image_annotations["annotation"]["size"]["height"]), \
-        int(image_annotations["annotation"]["size"]["width"])
-
-    target_shape = net.utilities.get_target_shape(image_size, size_factor)
-
-    y_resize_fraction = target_shape[0] / image_size[0]
-    x_resize_fraction = target_shape[1] / image_size[1]
-
-    objects_sizes = []
-
-    for object_annotation in objects_annotations:
-
-        x_min, y_min, x_max, y_max = object_annotation.bounding_box
-
-        resized_bounding_box = \
-            round(x_min * x_resize_fraction), round(y_min * y_resize_fraction), \
-            round(x_max * x_resize_fraction), round(y_max * y_resize_fraction)
-
-        object_size = \
-            resized_bounding_box[3] - resized_bounding_box[1], \
-            resized_bounding_box[2] - resized_bounding_box[0]
-
-        objects_sizes.append(object_size)
-
-    return objects_sizes
-
-
 def analyze_objects_sizes(config):
     """
     Analyze objects sizes
@@ -94,26 +55,53 @@ def analyze_objects_sizes(config):
     images_filenames = net.data.get_dataset_filenames(
         config["voc"]["data_directory"], config["voc"]["train_and_validation_set_path"])
 
-    objects_sizes = []
+    annotations_paths = [os.path.join(config["voc"]["data_directory"], "Annotations", image_filename + ".xml")
+                         for image_filename in images_filenames]
 
-    for image_filename in tqdm.tqdm(images_filenames):
+    objects_sizes = net.data.get_adjusted_dataset_objects_sizes(annotations_paths, config["size_factor"], verbose=True)
 
-        annotations_path = os.path.join(config["voc"]["data_directory"], "Annotations", image_filename + ".xml")
+    for object_size in objects_sizes:
 
-        with open(annotations_path) as file:
+        adjusted_object_size = net.utilities.get_target_shape(object_size, size_factor=5)
 
-            image_annotations = xmltodict.parse(file.read())
+        if adjusted_object_size[0] == 0 or adjusted_object_size[1] == 0:
+            raise ValueError("Object size {} after adjusting is {}".format(object_size, adjusted_object_size))
 
-            image_objects_sizes = get_adjusted_object_sizes(image_annotations, config["size_factor"])
-            objects_sizes.extend(image_objects_sizes)
+    # # Within a small margin, force objects to be the same size, so we can see frequent sizes groups more easily
+    # adjusted_object_sizes = [net.utilities.get_target_shape(size, size_factor=5) for size in objects_sizes]
+    #
+    # for object_size in adjusted_object_sizes:
+    #
+    #     if object_size[0] == 0 or object_size[1] == 0:
+    #         raise ValueError("Object size is {}".format(object_size))
 
+    # sizes_counter = collections.Counter(adjusted_object_sizes)
+    # ordered_sizes = sorted(sizes_counter.items(), key=lambda x: x[1], reverse=True)
+    #
+    # for size, count in ordered_sizes[:500]:
+    #     print("{} -> {}".format(count, size))
+
+
+def analyze_objects_aspect_ratios(config):
+    """
+    Analyze objects aspect ratios
+    :param config: configuration dictionary
+    """
+
+    images_filenames = net.data.get_dataset_filenames(
+        config["voc"]["data_directory"], config["voc"]["train_and_validation_set_path"])
+
+    annotations_paths = [os.path.join(config["voc"]["data_directory"], "Annotations", image_filename + ".xml")
+                         for image_filename in images_filenames]
+
+    objects_sizes = net.data.get_adjusted_dataset_objects_sizes(annotations_paths, config["size_factor"], verbose=True)
+
+    # Within a small margin, force objects to be the same size, so we can see frequent sizes groups more easily
     adjusted_object_sizes = [net.utilities.get_target_shape(size, size_factor=5) for size in objects_sizes]
 
-    sizes_counter = collections.Counter(adjusted_object_sizes)
-    ordered_sizes = sorted(sizes_counter.items(), key=lambda x: x[1], reverse=True)
-
-    for size, count in ordered_sizes[:500]:
-        print("{} -> {}".format(count, size))
+    aspect_ratios = [width / height for (height, width) in adjusted_object_sizes]
+    print(*aspect_ratios, sep="\n")
+    print(len(aspect_ratios))
 
 
 def main():
@@ -131,6 +119,7 @@ def main():
 
     # analyze_images_sizes(config)
     analyze_objects_sizes(config)
+    # analyze_objects_aspect_ratios(config)
 
 
 if __name__ == "__main__":
