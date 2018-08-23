@@ -58,28 +58,41 @@ def analyze_objects_sizes(config):
     annotations_paths = [os.path.join(config["voc"]["data_directory"], "Annotations", image_filename + ".xml")
                          for image_filename in images_filenames]
 
-    objects_sizes = net.data.get_adjusted_dataset_objects_sizes(annotations_paths, config["size_factor"], verbose=True)
+    all_annotations = []
 
-    for object_size in objects_sizes:
+    for annotations_path in tqdm.tqdm(annotations_paths):
 
-        adjusted_object_size = net.utilities.get_target_shape(object_size, size_factor=5)
+        with open(annotations_path) as file:
 
-        if adjusted_object_size[0] == 0 or adjusted_object_size[1] == 0:
-            raise ValueError("Object size {} after adjusting is {}".format(object_size, adjusted_object_size))
+            image_annotations_xml = xmltodict.parse(file.read())
 
-    # # Within a small margin, force objects to be the same size, so we can see frequent sizes groups more easily
-    # adjusted_object_sizes = [net.utilities.get_target_shape(size, size_factor=5) for size in objects_sizes]
-    #
-    # for object_size in adjusted_object_sizes:
-    #
-    #     if object_size[0] == 0 or object_size[1] == 0:
-    #         raise ValueError("Object size is {}".format(object_size))
+            image_size = \
+                int(image_annotations_xml["annotation"]["size"]["height"]), \
+                int(image_annotations_xml["annotation"]["size"]["width"])
 
-    # sizes_counter = collections.Counter(adjusted_object_sizes)
-    # ordered_sizes = sorted(sizes_counter.items(), key=lambda x: x[1], reverse=True)
-    #
-    # for size, count in ordered_sizes[:500]:
-    #     print("{} -> {}".format(count, size))
+            # Read annotations
+            annotations = net.data.get_objects_annotations(image_annotations_xml)
+
+            # Resize annotations in line with how we would resize the image
+            annotations = [annotation.resize(image_size, config["size_factor"]) for annotation in annotations]
+
+            # Discard odd sized annotations
+            annotations = \
+                [annotation for annotation in annotations
+                 if not net.utilities.is_annotation_size_unusual(annotation, **config["objects_filtering"])]
+
+            all_annotations.extend(annotations)
+
+    sizes = [annotation.size for annotation in all_annotations]
+
+    # Within a small margin, force objects to be the same size, so we can see frequent sizes groups more easily
+    sizes = [net.utilities.get_target_shape(size, size_factor=5) for size in sizes]
+
+    sizes_counter = collections.Counter(sizes)
+    ordered_sizes = sorted(sizes_counter.items(), key=lambda x: x[1], reverse=True)
+
+    for size, count in ordered_sizes[:500]:
+        print("{} -> {}".format(count, size))
 
 
 def analyze_objects_aspect_ratios(config):
@@ -94,7 +107,7 @@ def analyze_objects_aspect_ratios(config):
     annotations_paths = [os.path.join(config["voc"]["data_directory"], "Annotations", image_filename + ".xml")
                          for image_filename in images_filenames]
 
-    objects_sizes = net.data.get_adjusted_dataset_objects_sizes(annotations_paths, config["size_factor"], verbose=True)
+    objects_sizes = net.data.get_resized_dataset_objects_sizes(annotations_paths, config["size_factor"], verbose=True)
 
     # Within a small margin, force objects to be the same size, so we can see frequent sizes groups more easily
     adjusted_object_sizes = [net.utilities.get_target_shape(size, size_factor=5) for size in objects_sizes]

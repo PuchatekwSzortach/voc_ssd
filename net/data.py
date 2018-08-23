@@ -117,12 +117,14 @@ class VOCSamplesGeneratorFactory:
         return len(self.images_filenames)
 
 
-def get_adjusted_objects_sizes(image_annotations, size_factor):
+def get_resized_objects_sizes(image_annotations, size_factor):
     """
     Given image annotations dictionary and size factor,
-    return list of object sizes adjusted to a multiple of size factor
+    return list of object sizes that are resized as if the image they are contained in was resized to be
+    a multiple of size factor
     :param image_annotations: dictionary with image annotations
-    :param size_factor: integer, factor a multiple of which sizes should be adjusted to
+    :param size_factor: integer, factor a multiple of which image containing annotations would be resized to,
+    thus influencing how annotated objects will be resized as well
     :return: list of (object height, object width) tuples
     """
 
@@ -156,9 +158,9 @@ def get_adjusted_objects_sizes(image_annotations, size_factor):
     return objects_sizes
 
 
-def get_adjusted_dataset_objects_sizes(annotations_paths, size_factor, verbose=False):
+def get_resized_dataset_objects_sizes(annotations_paths, size_factor, verbose=False):
     """
-    Given annotations paths and size factor a multiple of which we want to resize images to be,
+    Given annotations paths and size factor a multiple of which we want resized images to be,
     return all objects sizes from all annotations. Objects are resized in line with hypothetical image resize
     given by size_factor
     :param annotations_paths: list of strings, paths to annotation files
@@ -176,7 +178,7 @@ def get_adjusted_dataset_objects_sizes(annotations_paths, size_factor, verbose=F
 
             # Since we are resizing image to be a multiple of 32 before feeding them to the network,
             # we need to do the same to objects inside the image
-            image_objects_sizes = net.data.get_adjusted_objects_sizes(image_annotations, size_factor)
+            image_objects_sizes = net.data.get_resized_objects_sizes(image_annotations, size_factor)
             objects_sizes.extend(image_objects_sizes)
 
     return objects_sizes
