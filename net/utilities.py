@@ -26,7 +26,6 @@ class Annotation:
     def width(self):
         """
         Width of annotation's bounding box
-        :return:
         """
         return self.bounding_box[2] - self.bounding_box[0]
 
@@ -34,7 +33,6 @@ class Annotation:
     def height(self):
         """
         Height of annotation's bounding box
-        :return:
         """
         return self.bounding_box[3] - self.bounding_box[1]
 
@@ -42,9 +40,15 @@ class Annotation:
     def aspect_ratio(self):
         """
         Aspect ratio of annotation's bounding box
-        :return:
         """
         return self.width / self.height
+
+    @property
+    def size(self):
+        """
+        height, width tuple
+        """
+        return self.height, self.width
 
     def resize(self, image_size, size_factor):
         """
@@ -285,25 +289,25 @@ def get_resized_sample(image, bounding_boxes, size_factor):
     return resized_image, resized_bounding_boxes
 
 
-def is_annotation_size_unusual(annotation, min_size, min_aspect_ratio, max_aspect_ratio):
+def is_annotation_size_unusual(annotation, minimum_size, minimum_aspect_ratio, maximum_aspect_ratio):
     """
     Checks if object described by annotation has unusual size - is too small or has unusual aspect ratio
     :param annotation: net.utilities.Annotation instance
-    :param min_size: int, minimum size object must have to be considered normal
-    :param min_aspect_ratio: float, minimum aspect ratio object must have to be considered normal.
+    :param minimum_size: int, minimum size object must have to be considered normal
+    :param minimum_aspect_ratio: float, minimum aspect ratio object must have to be considered normal.
     Both width to height and height to width ratios are tested against this criterion
-    :param max_aspect_ratio: float, maximum aspect ratio object must have to be considered normal.
+    :param maximum_aspect_ratio: float, maximum aspect ratio object must have to be considered normal.
     Both width to height and height to width ratios are tested against this criterion
     :return: bool, True if object size is unusual, False otherwise
     """
 
-    if annotation.width < min_size or annotation.height < min_size:
+    if annotation.width < minimum_size or annotation.height < minimum_size:
         return True
 
-    if annotation.aspect_ratio < min_aspect_ratio or 1 / annotation.aspect_ratio < min_aspect_ratio:
+    if annotation.aspect_ratio < minimum_aspect_ratio or 1 / annotation.aspect_ratio < minimum_aspect_ratio:
         return True
 
-    if annotation.aspect_ratio > max_aspect_ratio or 1 / annotation.aspect_ratio > max_aspect_ratio:
+    if annotation.aspect_ratio > maximum_aspect_ratio or 1 / annotation.aspect_ratio > maximum_aspect_ratio:
         return True
 
     return False
