@@ -23,7 +23,7 @@ def log_voc_samples_generator_output(logger, config):
 
     categories_to_colors_map = net.utilities.get_categories_to_colors_map(config["categories"])
 
-    for _ in tqdm.tqdm(range(10)):
+    for _ in tqdm.tqdm(range(100)):
 
         image, annotations = next(generator)
 
@@ -125,8 +125,8 @@ def main():
 
     logger = net.utilities.get_logger(config["log_path"])
 
-    # log_voc_samples_generator_output(logger, config)
-    log_samples_with_odd_sized_annotations(logger, config)
+    log_voc_samples_generator_output(logger, config)
+    # log_samples_with_odd_sized_annotations(logger, config)
 
 
 if __name__ == "__main__":

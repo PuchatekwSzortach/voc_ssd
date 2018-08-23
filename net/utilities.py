@@ -17,9 +17,9 @@ class Annotation:
     A simple class for bundling bounding box and category of an object
     """
 
-    def __init__(self, bounding_box, label):
+    def __init__(self, bounding_box, label=None):
 
-        self.bounding_box = bounding_box
+        self.bounding_box = tuple(bounding_box)
         self.label = label
 
     @property
@@ -45,6 +45,39 @@ class Annotation:
         :return:
         """
         return self.width / self.height
+
+    def resize(self, image_size, size_factor):
+        """
+        Returns a new Annotation instance that is resized as if hypothetical image containing it was resized to be
+        a multiple of size_factor
+        :param image_size: tuple of ints, (height, width)
+        :param size_factor: int
+        :return: Annotation instance
+        """
+
+        target_shape = get_target_shape(image_size, size_factor)
+
+        y_resize_fraction = target_shape[0] / image_size[0]
+        x_resize_fraction = target_shape[1] / image_size[1]
+
+        x_min, y_min, x_max, y_max = self.bounding_box
+
+        resized_bounding_box = \
+            round(x_min * x_resize_fraction), round(y_min * y_resize_fraction), \
+            round(x_max * x_resize_fraction), round(y_max * y_resize_fraction)
+
+        return Annotation(resized_bounding_box, self.label)
+
+    def __eq__(self, other):
+
+        if not isinstance(other, self.__class__):
+            return False
+
+        return self.bounding_box == other.bounding_box and self.label == other.label
+
+    def __repr__(self):
+
+        return "Annotation: {}, {}".format(self.label, self.bounding_box)
 
 
 def get_logger(path):

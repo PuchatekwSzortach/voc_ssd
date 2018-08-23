@@ -161,3 +161,35 @@ def test_is_annotation_size_unusual_object_has_normal_size():
         annotation, min_size, min_aspect_ratio, max_aspect_ratio)
 
     assert expected == actual
+
+
+def test_annotation_resize_no_resize_needed():
+    """
+    Test Annotation.resize - no resize actually needed
+    """
+
+    annotation = net.utilities.Annotation([10, 20, 20, 40])
+
+    image_size = (100, 200)
+    size_factor = 10
+
+    expected = net.utilities.Annotation([10, 20, 20, 40])
+    actual = annotation.resize(image_size, size_factor)
+
+    assert expected == actual
+
+
+def test_annotation_resize_resize_needed():
+    """
+    Test Annotation.resize - both shrinking and expanding object needed
+    """
+
+    annotation = net.utilities.Annotation([10, 20, 20, 40])
+
+    image_size = (80, 220)
+    size_factor = 50
+
+    expected = net.utilities.Annotation([9, 25, 18, 50])
+    actual = annotation.resize(image_size, size_factor)
+
+    assert expected == actual

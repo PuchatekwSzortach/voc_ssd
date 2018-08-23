@@ -58,14 +58,28 @@ def analyze_objects_sizes(config):
     annotations_paths = [os.path.join(config["voc"]["data_directory"], "Annotations", image_filename + ".xml")
                          for image_filename in images_filenames]
 
-    objects_sizes = net.data.get_adjusted_dataset_objects_sizes(annotations_paths, config["size_factor"], verbose=True)
+    for annotations_path in tqdm.tqdm(annotations_paths):
 
-    for object_size in objects_sizes:
+        with open(annotations_path) as file:
 
-        adjusted_object_size = net.utilities.get_target_shape(object_size, size_factor=5)
+            image_annotations_xml = xmltodict.parse(file.read())
 
-        if adjusted_object_size[0] == 0 or adjusted_object_size[1] == 0:
-            raise ValueError("Object size {} after adjusting is {}".format(object_size, adjusted_object_size))
+            image_size = \
+                int(image_annotations_xml["annotation"]["size"]["height"]), \
+                int(image_annotations_xml["annotation"]["size"]["width"])
+
+            annotations = net.data.get_objects_annotations(image_annotations_xml)
+
+    # Resize annotations in line with images
+
+    # objects_sizes = net.data.get_resized_dataset_objects_sizes(annotations_paths, config["size_factor"], verbose=True)
+    #
+    # for object_size in objects_sizes:
+    #
+    #     adjusted_object_size = net.utilities.get_target_shape(object_size, size_factor=5)
+    #
+    #     if adjusted_object_size[0] == 0 or adjusted_object_size[1] == 0:
+    #         raise ValueError("Object size {} after adjusting is {}".format(object_size, adjusted_object_size))
 
     # # Within a small margin, force objects to be the same size, so we can see frequent sizes groups more easily
     # adjusted_object_sizes = [net.utilities.get_target_shape(size, size_factor=5) for size in objects_sizes]
@@ -94,7 +108,7 @@ def analyze_objects_aspect_ratios(config):
     annotations_paths = [os.path.join(config["voc"]["data_directory"], "Annotations", image_filename + ".xml")
                          for image_filename in images_filenames]
 
-    objects_sizes = net.data.get_adjusted_dataset_objects_sizes(annotations_paths, config["size_factor"], verbose=True)
+    objects_sizes = net.data.get_resized_dataset_objects_sizes(annotations_paths, config["size_factor"], verbose=True)
 
     # Within a small margin, force objects to be the same size, so we can see frequent sizes groups more easily
     adjusted_object_sizes = [net.utilities.get_target_shape(size, size_factor=5) for size in objects_sizes]
