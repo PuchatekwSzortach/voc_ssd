@@ -5,6 +5,8 @@ Data generators and other data-related code
 import os
 import copy
 import random
+import threading
+import queue
 
 import xmltodict
 import tqdm
@@ -58,7 +60,7 @@ def get_objects_annotations(image_annotations):
 
 class VOCSamplesGeneratorFactory:
     """
-    Factory class creating data batches generators that yield (image, bounding boxes) pairs
+    Factory class creating data generator that yield (image, bounding boxes) pairs
     """
 
     def __init__(self, data_directory, data_set_path, size_factor):
@@ -115,6 +117,78 @@ class VOCSamplesGeneratorFactory:
         :return: int
         """
         return len(self.images_filenames)
+
+
+class PreprocessedVOCSamplesGeneratorFactory:
+    """
+    Factory class creating data generator. VOC data is filtered and preprocessed as best needed for training.
+    """
+
+    def __init__(self, voc_samples_generator_factory, objects_filtering_config):
+        """
+        Constructor
+        :param voc_samples_generator_factory: factory that creates generator yielding (image, annotations) tuples
+        from VOC dataset
+        :param objects_filtering_config: dictionary with options for objects filtering
+        """
+
+        self.voc_samples_generator_factory = voc_samples_generator_factory
+        self.objects_filtering_config = objects_filtering_config
+
+        self._samples_queue = queue.Queue(maxsize=100)
+        self._samples_generation_thread = None
+        self._continue_generating_samples = None
+
+    def get_generator(self):
+        """
+        Returns generator that yields samples (image, annotations)
+        :return: generator
+        """
+
+        self._continue_generating_samples = True
+
+        self._samples_generation_thread = threading.Thread(
+            target=self._samples_generation_task,
+            args=(self.voc_samples_generator_factory, self._samples_queue, self.objects_filtering_config))
+
+        self._samples_generation_thread.start()
+
+        while True:
+
+            sample = self._samples_queue.get()
+            self._samples_queue.task_done()
+            yield sample
+
+    def _samples_generation_task(self, voc_samples_generator_factory, samples_queue, objects_filtering_config):
+
+        generator = voc_samples_generator_factory.get_generator()
+
+        while self._continue_generating_samples is True:
+
+            image, annotations = next(generator)
+
+            # Discard odd sized annotations
+            annotations = \
+                [annotation for annotation in annotations
+                 if not net.utilities.is_annotation_size_unusual(annotation, **objects_filtering_config)]
+
+            sample = image, annotations
+            samples_queue.put(sample)
+
+    def stop_generator(self):
+        """
+        Signal data loading thread to finish working and purge the data queue.
+        """
+
+        self._continue_generating_samples = False
+
+        while not self._samples_queue.empty():
+
+            self._samples_queue.get()
+            self._samples_queue.task_done()
+
+        self._samples_queue.join()
+        self._samples_generation_thread.join()
 
 
 def get_resized_objects_sizes(image_annotations, size_factor):
