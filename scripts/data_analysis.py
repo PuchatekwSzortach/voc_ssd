@@ -10,6 +10,8 @@ import collections
 import yaml
 import tqdm
 import xmltodict
+import matplotlib.pyplot as plt
+import vlogging
 
 import net.data
 import net.utilities
@@ -46,10 +48,12 @@ def analyze_images_sizes(config):
         print("{} -> {}".format(count, size))
 
 
-def analyze_objects_sizes(config):
+def get_filtered_dataset_annotations(config):
     """
-    Analyze objects sizes
+    Retrieves annotations for the dataset, scales them in accordance to how their images would be scaled
+    in prediction, filters ount unusually sized annotations, then returns annotations that made it through filtering
     :param config: configuration dictionary
+    :return: list of net.utilities.Annotation instances
     """
 
     images_filenames = net.data.get_dataset_filenames(
@@ -61,9 +65,7 @@ def analyze_objects_sizes(config):
     all_annotations = []
 
     for annotations_path in tqdm.tqdm(annotations_paths):
-
         with open(annotations_path) as file:
-
             image_annotations_xml = xmltodict.parse(file.read())
 
             image_size = \
@@ -83,7 +85,17 @@ def analyze_objects_sizes(config):
 
             all_annotations.extend(annotations)
 
-    sizes = [annotation.size for annotation in all_annotations]
+    return all_annotations
+
+
+def analyze_objects_sizes(config):
+    """
+    Analyze objects sizes
+    :param config: configuration dictionary
+    """
+
+    annotations = get_filtered_dataset_annotations(config)
+    sizes = [annotation.size for annotation in annotations]
 
     # Within a small margin, force objects to be the same size, so we can see frequent sizes groups more easily
     sizes = [net.utilities.get_target_shape(size, size_factor=5) for size in sizes]
@@ -95,26 +107,37 @@ def analyze_objects_sizes(config):
         print("{} -> {}".format(count, size))
 
 
-def analyze_objects_aspect_ratios(config):
+def analyze_objects_aspect_ratios(logger, config):
     """
     Analyze objects aspect ratios
+    :param logger: logger instance
     :param config: configuration dictionary
     """
 
-    images_filenames = net.data.get_dataset_filenames(
-        config["voc"]["data_directory"], config["voc"]["train_and_validation_set_path"])
-
-    annotations_paths = [os.path.join(config["voc"]["data_directory"], "Annotations", image_filename + ".xml")
-                         for image_filename in images_filenames]
-
-    objects_sizes = net.data.get_resized_dataset_objects_sizes(annotations_paths, config["size_factor"], verbose=True)
+    annotations = get_filtered_dataset_annotations(config)
+    sizes = [annotation.size for annotation in annotations]
 
     # Within a small margin, force objects to be the same size, so we can see frequent sizes groups more easily
-    adjusted_object_sizes = [net.utilities.get_target_shape(size, size_factor=5) for size in objects_sizes]
+    sizes = [net.utilities.get_target_shape(size, size_factor=5) for size in sizes]
 
-    aspect_ratios = [width / height for (height, width) in adjusted_object_sizes]
-    print(*aspect_ratios, sep="\n")
-    print(len(aspect_ratios))
+    aspect_ratios = [width / height for (height, width) in sizes]
+    aspect_ratios = [net.utilities.round_to_factor(aspect_ratio, 0.2) for aspect_ratio in aspect_ratios]
+
+    aspect_ratios_counter = collections.Counter(aspect_ratios)
+    ordered_aspect_ratios_counter = sorted(aspect_ratios_counter.items(), key=lambda x: x[1], reverse=True)
+
+    values = []
+    indices = []
+
+    for aspect_ratio, count in ordered_aspect_ratios_counter[:500]:
+        print("{} -> {}".format(count, aspect_ratio))
+
+        indices.append(aspect_ratio)
+        values.append(count)
+
+    figure = plt.figure()
+    plt.bar(indices, values)
+    logger.info(vlogging.VisualRecord("Aspect ratios", figure))
 
 
 def main():
@@ -131,8 +154,11 @@ def main():
         config = yaml.safe_load(file)
 
     # analyze_images_sizes(config)
-    analyze_objects_sizes(config)
-    # analyze_objects_aspect_ratios(config)
+    # analyze_objects_sizes(config)
+
+    logger = net.utilities.get_logger(config["log_path"])
+
+    analyze_objects_aspect_ratios(logger, config)
 
 
 if __name__ == "__main__":
