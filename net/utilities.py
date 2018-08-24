@@ -311,3 +311,14 @@ def is_annotation_size_unusual(annotation, minimum_size, minimum_aspect_ratio, m
         return True
 
     return False
+
+
+def round_to_factor(value, factor):
+    """
+    Round value to nearest multiple of factor. Factor can be a float
+    :param value: float
+    :param factor: float
+    :return: float
+    """
+
+    return factor * round(value / factor)

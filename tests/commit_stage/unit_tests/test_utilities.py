@@ -193,3 +193,59 @@ def test_annotation_resize_resize_needed():
     actual = annotation.resize(image_size, size_factor)
 
     assert expected == actual
+
+
+def test_round_to_factor_factor_is_an_integer_rounding_up_is_needed():
+    """
+    Test round_to_factor when rounding up to an integer factor
+    """
+
+    value = 18
+    factor = 5
+
+    expected = 20
+    actual = net.utilities.round_to_factor(value, factor)
+
+    assert expected == actual
+
+
+def test_round_to_factor_factor_is_an_integer_rounding_down_is_needed():
+    """
+    Test round_to_factor when rounding down to an integer factor
+    """
+
+    value = 17
+    factor = 5
+
+    expected = 15
+    actual = net.utilities.round_to_factor(value, factor)
+
+    assert expected == actual
+
+
+def test_round_to_factor_factor_is_a_float_rounding_up_is_needed():
+    """
+    Test round_to_factor when rounding up to a float factor
+    """
+
+    value = 10.91
+    factor = 0.2
+
+    expected = 11
+    actual = net.utilities.round_to_factor(value, factor)
+
+    assert expected == actual
+
+
+def test_round_to_factor_factor_is_a_float_rounding_down_is_needed():
+    """
+    Test round_to_factor when rounding down to a float factor
+    """
+
+    value = 10.87
+    factor = 0.2
+
+    expected = 10.8
+    actual = net.utilities.round_to_factor(value, factor)
+
+    assert expected == actual
