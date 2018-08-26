@@ -154,7 +154,7 @@ def main():
         config = yaml.safe_load(file)
 
     # analyze_images_sizes(config)
-    # analyze_objects_sizes(config)
+    analyze_objects_sizes(config)
 
     logger = net.utilities.get_logger(config["log_path"])
 

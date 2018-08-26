@@ -38,3 +38,10 @@ objects_filtering:
   minimum_size: 15
   minimum_aspect_ratio: 0.2
   maximum_aspect_ratio: 5
+
+
+vggish_model_configuration:
+    predicion_heads_order: ["block3_head"]
+    block3_head:
+      image_downscale_factor: 8
+      base_bounding_box_size: 50

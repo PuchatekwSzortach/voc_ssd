@@ -249,3 +249,25 @@ def test_round_to_factor_factor_is_a_float_rounding_down_is_needed():
     actual = net.utilities.round_to_factor(value, factor)
 
     assert expected == actual
+
+
+def test_get_annotations_from_default_boxes():
+    """
+    Test converting default boxes matrix to list of Annotation instances
+    """
+
+    default_boxes_matrix = np.array([
+        [10, 20, 30, 40, 0],
+        [40, 20, 80, 120, 2],
+        [1, 200, 300, 240, 1],
+    ])
+
+    expected = [
+        net.utilities.Annotation([10, 20, 30, 40]),
+        net.utilities.Annotation([40, 20, 80, 120]),
+        net.utilities.Annotation([1, 200, 300, 240])
+    ]
+
+    actual = net.utilities.get_annotations_from_default_boxes(default_boxes_matrix)
+
+    assert expected == actual

@@ -11,6 +11,8 @@ import vlogging
 
 import net.utilities
 import net.data
+import net.ssd
+import net.plot
 
 
 def log_voc_samples_generator_output(logger, config):
@@ -29,8 +31,7 @@ def log_voc_samples_generator_output(logger, config):
 
         colors = [categories_to_colors_map[annotation.label] for annotation in annotations]
 
-        image = net.utilities.get_annotated_image(
-            image, annotations, colors, config["font_path"])
+        image = net.plot.get_annotated_image(image, annotations, colors, config["font_path"])
 
         labels = [annotation.label for annotation in annotations]
         message = "{} - {}".format(image.shape[:2], labels)
@@ -50,7 +51,7 @@ def log_sample_with_odd_sized_annotation(logger, image, annotations, categories_
 
     colors = [categories_to_colors_map[annotation.label] for annotation in annotations]
 
-    image = net.utilities.get_annotated_image(image, annotations, colors, font_path)
+    image = net.plot.get_annotated_image(image, annotations, colors, font_path)
 
     labels = []
 
@@ -110,6 +111,35 @@ def log_samples_with_odd_sized_annotations(logger, config):
         unusual_sized_annotation_count, all_annotations_count))
 
 
+def log_default_boxes_matches(logger, config):
+    """
+    Log default boxes matches
+    """
+
+    voc_samples_generator_factory = net.data.VOCSamplesGeneratorFactory(
+        config["voc"]["data_directory"], config["voc"]["validation_set_path"], config["size_factor"])
+
+    ssd_input_generator_factory = net.data.SSDInputGeneratorFactory(
+        voc_samples_generator_factory, config["objects_filtering"])
+
+    ssd_input_generator = ssd_input_generator_factory.get_generator()
+
+    default_boxes_factory = net.ssd.DefaultBoxesFactory(config["vggish_model_configuration"])
+
+    for _ in tqdm.tqdm(range(10)):
+
+        image, annotations = next(ssd_input_generator)
+        default_boxes_matrix = default_boxes_factory.get_default_boxes_matrix(image.shape)
+
+        annotations = net.utilities.get_annotations_from_default_boxes(default_boxes_matrix)
+        colors = [(0, 255, 0) for _ in annotations]
+
+        image = net.plot.get_annotated_image(image, annotations, colors=colors, draw_labels=False)
+        logger.info(vlogging.VisualRecord("Default boxes", image))
+
+    ssd_input_generator_factory.stop_generator()
+
+
 def main():
     """
     Script entry point
@@ -125,8 +155,10 @@ def main():
 
     logger = net.utilities.get_logger(config["log_path"])
 
-    log_voc_samples_generator_output(logger, config)
+    # log_voc_samples_generator_output(logger, config)
     # log_samples_with_odd_sized_annotations(logger, config)
+
+    log_default_boxes_matches(logger, config)
 
 
 if __name__ == "__main__":
