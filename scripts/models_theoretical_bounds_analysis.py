@@ -38,7 +38,7 @@ def main():
     for _ in tqdm.tqdm(range(10)):
 
         image, annotations = next(ssd_input_generator)
-        default_boxes_matrix = default_boxes_factory.get_default_boxes_matrix()
+        default_boxes_matrix = default_boxes_factory.get_default_boxes_matrix(image.shape)
 
         print(image.shape)
         print(len(annotations))
