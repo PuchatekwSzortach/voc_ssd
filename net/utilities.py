@@ -6,9 +6,6 @@ import os
 import logging
 
 import numpy as np
-import PIL.ImageDraw
-import PIL.ImageFont
-import PIL.Image
 import cv2
 
 
@@ -175,62 +172,6 @@ def get_image_with_bounding_boxes(image, bounding_boxes):
     return annotated_image
 
 
-def draw_annotation_label(pil_image, annotation, color, font):
-    """
-    Draw annotation label on an image
-    :param pil_image: PIL.Image object
-    :param annotation: net.utilities.Annotation instance
-    :param color: color to use for label background
-    :param font: PIL.ImageFont object
-    """
-
-    draw_manager = PIL.ImageDraw.Draw(pil_image)
-
-    text_size = draw_manager.textsize(annotation.label, font)
-
-    box_left = int(max(0, np.floor(annotation.bounding_box[0] + 0.5)))
-    box_top = int(max(0, np.floor(annotation.bounding_box[1] + 0.5)))
-
-    text_origin = [box_left, box_top - text_size[1]] \
-        if box_top - text_size[1] >= 0 else [box_left, box_top + 1]
-
-    text_end = text_origin[0] + text_size[0], text_origin[1] + text_size[1]
-    text_box = text_origin[0], text_origin[1], text_end[0], text_end[1]
-
-    draw_manager.rectangle(text_box, fill=tuple(color))
-    draw_manager.text(text_origin, annotation.label, fill=(255, 255, 255), font=font)
-
-
-def get_annotated_image(image, annotations, colors, font_path):
-    """
-    Get a copy of input image with bounding boxes drawn on it. Colors of bounding boxes are selected per
-    unique per category and each bounding box includes a label stating its category.
-    :param image: numpy array
-    :param annotations: list of net.utilities.Annotation object
-    :param colors: list of colors to be used for each annotation
-    :param font_path: path to font file
-    :return: numpy array, an annotated image
-    """
-
-    annotated_image = image.copy()
-
-    for annotation, color in zip(annotations, colors):
-
-        box = annotation.bounding_box
-
-        cv2.rectangle(annotated_image, (box[0], box[1]), (box[2], box[3]), color=color, thickness=3)
-
-    pil_image = PIL.Image.fromarray(annotated_image)
-
-    font = PIL.ImageFont.truetype(font_path, size=20)
-
-    for annotation, color in zip(annotations, colors):
-
-        draw_annotation_label(pil_image, annotation, color, font)
-
-    return np.array(pil_image)
-
-
 def get_target_shape(shape, size_factor):
     """
     Given an shape tuple and size_factor, return a new shape tuple such that each of its dimensions
@@ -322,3 +263,15 @@ def round_to_factor(value, factor):
     """
 
     return factor * round(value / factor)
+
+
+def get_annotations_from_default_boxes(default_boxes_matrix):
+    """
+    Converts a matrix of default boxes into a list of Annotation instances
+    :param default_boxes_matrix: 2D numpy array with 5 elements per row -
+    [x_left, y_top, x_right, y_bottom, category_id]
+    :return: list of Annotation instances
+    """
+
+    integer_boxes_matrix = default_boxes_matrix.astype(np.int32)
+    return [Annotation(default_box[:4]) for default_box in integer_boxes_matrix]

@@ -119,9 +119,9 @@ class VOCSamplesGeneratorFactory:
         return len(self.images_filenames)
 
 
-class PreprocessedVOCSamplesGeneratorFactory:
+class SSDInputGeneratorFactory:
     """
-    Factory class creating data generator. VOC data is filtered and preprocessed as best needed for training.
+    Factory class creating data generator that can be used to feed an SSD model
     """
 
     def __init__(self, voc_samples_generator_factory, objects_filtering_config):
