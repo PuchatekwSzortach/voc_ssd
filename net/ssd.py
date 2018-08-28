@@ -4,6 +4,8 @@ Module with SSD-specific computations
 
 import numpy as np
 
+import net.utilities
+
 
 class DefaultBoxesFactory:
     """
@@ -60,3 +62,38 @@ class DefaultBoxesFactory:
                 boxes.append(box)
 
         return np.vstack(boxes)
+
+
+def get_matching_analysis_generator(ssd_model_configuration, ssd_input_generator):
+    """
+    Generator that accepts ssd_input_generator and yield a generator that outputs tuples of
+    matched_annotations and unmatched_annotations, both of which are lists of Annotation instances.
+    :param ssd_model_configuration: dictionary of options specifying ssd model's configuration
+    :param ssd_input_generator: generator that outputs (image, annotations) tuples
+    :return: generator that outputs (matched_annotations, unmatched_annotations) tuples
+    """
+
+    default_boxes_factory = DefaultBoxesFactory(ssd_model_configuration)
+
+    while True:
+
+        image, annotations = next(ssd_input_generator)
+        default_boxes_matrix = default_boxes_factory.get_default_boxes_matrix(image.shape)
+
+        matched_annotations = []
+        unmatched_annotations = []
+
+        for annotation in annotations:
+
+            matched_default_boxes_indices = net.utilities.get_matched_boxes_indices(
+                annotation.bounding_box, default_boxes_matrix)
+
+            if len(matched_default_boxes_indices) > 0:
+
+                matched_annotations.append(annotation)
+
+            else:
+
+                unmatched_annotations.append(annotation)
+
+        yield matched_annotations, unmatched_annotations

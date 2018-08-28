@@ -8,6 +8,8 @@ import PIL.Image
 import PIL.ImageFont
 import cv2
 
+import net.utilities
+
 
 def draw_annotation_label(pil_image, annotation, color, font):
     """
@@ -69,3 +71,18 @@ def get_annotated_image(image, annotations, colors, draw_labels=True, font_path=
         draw_annotation_label(pil_image, annotation, color, font)
 
     return np.array(pil_image)
+
+
+def get_image_with_boxes(image, boxes, color):
+    """
+    Creates a new image with boxes drawn on original image in color specified
+    :param image: numpy array
+    :param boxes: list of boxes in corner format
+    :param color: 3-element tuple
+    :return: numpy array
+    """
+
+    boxes_annotations = net.utilities.get_annotations_from_default_boxes(boxes)
+    colors = [color for _ in boxes]
+
+    return net.plot.get_annotated_image(image, boxes_annotations, colors=colors, draw_labels=False)

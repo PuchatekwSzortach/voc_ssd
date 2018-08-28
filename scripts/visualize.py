@@ -111,6 +111,41 @@ def log_samples_with_odd_sized_annotations(logger, config):
         unusual_sized_annotation_count, all_annotations_count))
 
 
+def log_default_boxes_matches_for_single_sample(
+        logger, ssd_input_generator, default_boxes_factory, categories_to_colors_map, font_path):
+    """
+    Logs default boxes matches for a single sample. If no default box was matched with any annotation,
+    nothing is logger.
+    :param logger: logger instance
+    :param ssd_input_generator: generator that outputs (image, annotations) tuples
+    :param default_boxes_factory: net.ssd.DefaultBoxesFactory instance
+    :param categories_to_colors_map: dictionary mapping categories labels to colors
+    :param font_path: path to font to be used to annotate images
+    """
+
+    image, annotations = next(ssd_input_generator)
+    default_boxes_matrix = default_boxes_factory.get_default_boxes_matrix(image.shape)
+
+    all_matched_default_boxes_indices = []
+
+    for annotation in annotations:
+        matched_default_boxes_indices = net.utilities.get_matched_boxes_indices(
+            annotation.bounding_box, default_boxes_matrix)
+
+        all_matched_default_boxes_indices.extend(matched_default_boxes_indices.tolist())
+
+    if len(all_matched_default_boxes_indices) > 0:
+        annotations_colors = [categories_to_colors_map[annotation.label] for annotation in annotations]
+
+        annotated_image = net.plot.get_annotated_image(
+            image, annotations, colors=annotations_colors, draw_labels=True, font_path=font_path)
+
+        matched_boxes = default_boxes_matrix[all_matched_default_boxes_indices]
+        matched_boxes_image = net.plot.get_image_with_boxes(image, matched_boxes, color=(0, 255, 0))
+
+        logger.info(vlogging.VisualRecord("Default boxes", [annotated_image, matched_boxes_image]))
+
+
 def log_default_boxes_matches(logger, config):
     """
     Log default boxes matches
@@ -125,17 +160,12 @@ def log_default_boxes_matches(logger, config):
     ssd_input_generator = ssd_input_generator_factory.get_generator()
 
     default_boxes_factory = net.ssd.DefaultBoxesFactory(config["vggish_model_configuration"])
+    categories_to_colors_map = net.utilities.get_categories_to_colors_map(config["categories"])
 
-    for _ in tqdm.tqdm(range(10)):
+    for _ in tqdm.tqdm(range(100)):
 
-        image, annotations = next(ssd_input_generator)
-        default_boxes_matrix = default_boxes_factory.get_default_boxes_matrix(image.shape)
-
-        annotations = net.utilities.get_annotations_from_default_boxes(default_boxes_matrix)
-        colors = [(0, 255, 0) for _ in annotations]
-
-        image = net.plot.get_annotated_image(image, annotations, colors=colors, draw_labels=False)
-        logger.info(vlogging.VisualRecord("Default boxes", image))
+        log_default_boxes_matches_for_single_sample(
+            logger, ssd_input_generator, default_boxes_factory, categories_to_colors_map, config["font_path"])
 
     ssd_input_generator_factory.stop_generator()
 
