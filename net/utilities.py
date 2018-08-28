@@ -275,3 +275,40 @@ def get_annotations_from_default_boxes(default_boxes_matrix):
 
     integer_boxes_matrix = default_boxes_matrix.astype(np.int32)
     return [Annotation(default_box[:4]) for default_box in integer_boxes_matrix]
+
+
+def get_matched_boxes_indices(template_box, boxes_matrix):
+    """
+    Checks for intersection over union between a matrix of boxes and a template box and returns indices
+    of boxes from the matrix that have intersection over union with the template box aboves 0.5
+    :param template_box: bounding box tuple (x_left, y_top, x_right, y_bottom)
+    :param boxes_matrix: 2D numpy array of boxes in [x_left, y_top, x_right, y_bottom] order
+    :return: 1D array of ints
+    """
+
+    template_x_center = (template_box[0] + template_box[2]) / 2
+
+    # Candidate bounding box has to have its left side border to the left of template box's center and
+    # right side border to the right of template box's center, otherwise IOU can't be over 0.5
+    horizontal_filter = (boxes_matrix[:, 0] < template_x_center) & (boxes_matrix[:, 2] > template_x_center)
+
+    template_y_center = (template_box[1] + template_box[3]) / 2
+
+    # Candidate bounding box has to have its top side border above template box's center and
+    # bottom side border below template box's center, otherwise IOU can't be over 0.5
+    vertical_filter = (boxes_matrix[:, 1] < template_y_center) & (boxes_matrix[:, 3] > template_y_center)
+
+    filtered_indices = np.where(horizontal_filter & vertical_filter)[0]
+
+    filtered_boxes = boxes_matrix[filtered_indices]
+
+    template_size = (template_box[2] - template_box[0]) * (template_box[3] - template_box[1])
+    filtered_boxes_sizes = (filtered_boxes[:, 2] - filtered_boxes[:, 0]) * (filtered_boxes[:, 3] - filtered_boxes[:, 1])
+
+    # Sizes ratio must be within (0.5, 1.5) range, otherwise IOU can't be above 0.5
+    sizes_ratios = filtered_boxes_sizes / template_size
+    sizes_filter = (sizes_ratios >= 0.5) & (sizes_ratios <= 1.5)
+
+    # Filter out indices by size_filter as well
+    filtered_indices = filtered_indices[np.where(sizes_filter)[0]]
+    return filtered_indices

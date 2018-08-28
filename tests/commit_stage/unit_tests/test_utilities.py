@@ -271,3 +271,47 @@ def test_get_annotations_from_default_boxes():
     actual = net.utilities.get_annotations_from_default_boxes(default_boxes_matrix)
 
     assert expected == actual
+
+
+def test_get_matched_boxes_indices_decision_can_be_made_looking_at_borders():
+    """
+    Test code matching matrix of bounding boxes with a template box.
+    Only simple input is used - boxes either hardly overlap, or overlap with high IOU.
+    """
+
+    template_box = (100, 100, 200, 200)
+
+    boxes_matrix = np.array([
+        [50, 50, 140, 140],
+        [101, 101, 200, 200],
+        [170, 170, 200, 200],
+        [99, 99, 201, 201],
+
+    ])
+
+    expected = np.array([1, 3])
+    actual = net.utilities.get_matched_boxes_indices(template_box, boxes_matrix)
+
+    assert np.all(expected == actual)
+
+
+def test_get_matched_boxes_indices_decision_can_be_made_looking_boxes_sizes_default_boxes_inside_template_box():
+    """
+    Test code matching matrix of bounding boxes with a template box.
+    All default boxes are inside template box, but some have too small area to have high IOU
+    """
+
+    template_box = (100, 100, 200, 200)
+
+    boxes_matrix = np.array([
+        [101, 101, 199, 199],
+        [140, 140, 160, 160],
+        [102, 102, 198, 198],
+        [145, 145, 155, 155],
+
+    ])
+
+    expected = np.array([0, 2])
+    actual = net.utilities.get_matched_boxes_indices(template_box, boxes_matrix)
+
+    assert np.all(expected == actual)
