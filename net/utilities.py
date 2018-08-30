@@ -305,10 +305,51 @@ def get_matched_boxes_indices(template_box, boxes_matrix):
     template_size = (template_box[2] - template_box[0]) * (template_box[3] - template_box[1])
     filtered_boxes_sizes = (filtered_boxes[:, 2] - filtered_boxes[:, 0]) * (filtered_boxes[:, 3] - filtered_boxes[:, 1])
 
-    # Sizes ratio must be within (0.5, 1.5) range, otherwise IOU can't be above 0.5
+    # Sizes ratio must be within (0.5, 2) range, otherwise IOU can't be above 0.5
     sizes_ratios = filtered_boxes_sizes / template_size
-    sizes_filter = (sizes_ratios >= 0.5) & (sizes_ratios <= 1.5)
+    sizes_filter = (sizes_ratios >= 0.5) & (sizes_ratios <= 2)
 
     # Filter out indices by size_filter as well
     filtered_indices = filtered_indices[np.where(sizes_filter)[0]]
+
+    # Computer IOUs for boxes that made it through simple filters
+    ious = get_vectorized_intersection_over_union(template_box, boxes_matrix[filtered_indices])
+
+    filtered_indices = filtered_indices[np.where(ious > 0.5)[0]]
     return filtered_indices
+
+
+def get_vectorized_intersection_over_union(template_box, boxes_matrix):
+    """
+    Computes IOU of template_box with every box in boxes_matrix
+    :param template_box: box in corner format
+    :param boxes_matrix: 2D numpy array, each row represents a box in corner format
+    :return: 1D numpy array of floats representing intersection over union values
+    """
+
+    # General idea: get the horizontal intersection, then vertical intersection, multiply results
+    # Then do the same for unions. Finally compute intersection / union
+
+    # To get horizontal intersection - get larger of x-left values and smaller of x-right values,
+    # then compute max(0, diff)
+    larger_x_left_values = np.maximum(template_box[0], boxes_matrix[:, 0])
+    smaller_x_right_values = np.minimum(template_box[2], boxes_matrix[:, 2])
+
+    horizontal_intersections = np.maximum(0, smaller_x_right_values - larger_x_left_values)
+
+    # To get vertical intersection - get larger of y-top values and smaller of y-bottom values,
+    # then compute max(0, diff)
+    larger_y_top_values = np.maximum(template_box[1], boxes_matrix[:, 1])
+    smaller_y_bottom_values = np.minimum(template_box[3], boxes_matrix[:, 3])
+
+    vertical_intersections = np.maximum(0, smaller_y_bottom_values - larger_y_top_values)
+
+    intersections = horizontal_intersections * vertical_intersections
+
+    # Union is just sum of areas of two boxes minus their intersectino
+    template_box_area = (template_box[2] - template_box[0]) * (template_box[3] - template_box[1])
+    boxes_areas = (boxes_matrix[:, 2] - boxes_matrix[:, 0]) * (boxes_matrix[:, 3] - boxes_matrix[:, 1])
+
+    unions = template_box_area + boxes_areas - intersections
+
+    return intersections / unions

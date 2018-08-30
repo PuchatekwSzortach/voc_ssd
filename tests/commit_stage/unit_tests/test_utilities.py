@@ -315,3 +315,91 @@ def test_get_matched_boxes_indices_decision_can_be_made_looking_boxes_sizes_defa
     actual = net.utilities.get_matched_boxes_indices(template_box, boxes_matrix)
 
     assert np.all(expected == actual)
+
+
+def test_get_matched_boxes_boxes_indices_iou_has_to_be_calculated_to_make_decision():
+    """
+    Test code matching matrix of bounding boxes with a template box.
+    All boxes overlap at least partially and iou has to be calculated to decide if boxes match with template
+    """
+
+    template_box = (100, 100, 200, 200)
+
+    boxes_matrix = np.array([
+        [110, 100, 210, 210],
+        [80, 80, 190, 190],
+        [70, 60, 180, 170],
+        [70, 60, 200, 200],
+
+    ])
+
+    expected = np.array([0, 1, 3])
+    actual = net.utilities.get_matched_boxes_indices(template_box, boxes_matrix)
+
+    assert np.all(expected == actual)
+
+
+def test_get_matched_boxes_boxes_indices_some_boxes_can_be_discarded_early_some_need_iou_computations():
+    """
+    Test code matching matrix of bounding boxes with a template box.
+    Some boxes can be discarded with simple checks, but some required explicit IOU computations.
+    """
+
+    template_box = (100, 100, 200, 200)
+
+    boxes_matrix = np.array([
+        [110, 110, 210, 210],
+        [50, 50, 70, 90],
+        [170, 80, 220, 200],
+        [95, 105, 200, 205]
+    ])
+
+    expected = np.array([0, 3])
+    actual = net.utilities.get_matched_boxes_indices(template_box, boxes_matrix)
+
+    assert np.all(expected == actual)
+
+
+def test_get_vectorized_intersection_over_union_all_boxes_are_outside_of_template_box():
+    """
+    Test vectorized iou computations.
+    Boxes don't overlap with template box.
+    """
+
+    template_box = (100, 100, 200, 200)
+
+    boxes_matrix = np.array([
+        [10, 10, 20, 20],  # Above and to the left of template box
+        [50, 100, 80, 200],  # Same y-coordinates, but to the left to template box
+        [250, 100, 270, 200],  # Same y-coordinates, but to the right to template box
+        [100, 40, 200, 90],  # Same x-coordinates, but above the template box
+        [100, 230, 200, 300],  # Same x-coordinates, but below the template box
+        [300, 300, 400, 400]  # Below and to the right of the template box
+    ])
+
+    expected = np.array([0, 0, 0, 0, 0, 0])
+    actual = net.utilities.get_vectorized_intersection_over_union(template_box, boxes_matrix)
+
+    assert np.all(expected == actual)
+
+
+def test_get_vectorized_intersection_over_various_overlapping_boxes():
+    """
+    Test vectorized iou computations.
+    Boxes overlap with template box to various degrees.
+    """
+
+    template_box = (100, 100, 200, 200)
+
+    boxes_matrix = np.array([
+        [100, 100, 200, 200],
+        [50, 150, 180, 220],
+        [80, 70, 170, 200],
+        [160, 180, 300, 300],
+
+    ])
+
+    expected = np.array([1, 40/151, 70/147, 2/65])
+    actual = net.utilities.get_vectorized_intersection_over_union(template_box, boxes_matrix)
+
+    assert np.all(expected == actual)
