@@ -3,7 +3,6 @@ Tests for net.utilities module
 """
 
 import numpy as np
-import pytest
 
 import net.utilities
 
@@ -362,6 +361,10 @@ def test_get_matched_boxes_boxes_indices_some_boxes_can_be_discarded_early_some_
 
 
 def test_get_vectorized_intersection_over_union_all_boxes_are_outside_of_template_box():
+    """
+    Test vectorized iou computations.
+    Boxes don't overlap with template box.
+    """
 
     template_box = (100, 100, 200, 200)
 
@@ -381,6 +384,10 @@ def test_get_vectorized_intersection_over_union_all_boxes_are_outside_of_templat
 
 
 def test_get_vectorized_intersection_over_various_overlapping_boxes():
+    """
+    Test vectorized iou computations.
+    Boxes overlap with template box to various degrees.
+    """
 
     template_box = (100, 100, 200, 200)
 
