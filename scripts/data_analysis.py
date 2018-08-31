@@ -100,29 +100,19 @@ def analyze_objects_sizes(annotations):
         print("{} -> {}".format(count, size))
 
 
-def analyze_objects_aspect_ratios(logger, config):
+def analyze_objects_aspect_ratios(logger, annotations):
     """
     Analyze objects aspect ratios
     :param logger: logger instance
-    :param config: configuration dictionary
+    :param annotations: list of Annotation instances
     """
 
-    annotations = get_filtered_dataset_annotations(config)
-    sizes = [annotation.size for annotation in annotations]
-
-    # Within a small margin, force objects to be the same size, so we can see frequent sizes groups more easily
-    sizes = [net.utilities.get_target_shape(size, size_factor=5) for size in sizes]
-
-    aspect_ratios = [width / height for (height, width) in sizes]
-    aspect_ratios = [net.utilities.round_to_factor(aspect_ratio, 0.2) for aspect_ratio in aspect_ratios]
-
-    aspect_ratios_counter = collections.Counter(aspect_ratios)
-    ordered_aspect_ratios_counter = sorted(aspect_ratios_counter.items(), key=lambda x: x[1], reverse=True)
+    ordered_aspect_ratios_counter = net.utilities.get_objects_aspect_ratios_analysis(annotations, size_factor=5)
 
     values = []
     indices = []
 
-    for aspect_ratio, count in ordered_aspect_ratios_counter[:500]:
+    for aspect_ratio, count in ordered_aspect_ratios_counter[:100]:
         print("{} -> {}".format(count, aspect_ratio))
 
         indices.append(aspect_ratio)
@@ -152,8 +142,7 @@ def main():
     analyze_objects_sizes(annotations)
 
     # logger = net.utilities.get_logger(config["log_path"])
-    #
-    # analyze_objects_aspect_ratios(logger, config)
+    # analyze_objects_aspect_ratios(logger, annotations)
 
 
 if __name__ == "__main__":

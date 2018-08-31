@@ -374,3 +374,24 @@ def get_objects_sizes_analysis(annotations, size_factor):
     ordered_sizes = sorted(sizes_counter.items(), key=lambda x: x[1], reverse=True)
 
     return [(count, size) for size, count in ordered_sizes]
+
+
+def get_objects_aspect_ratios_analysis(annotations, size_factor):
+    """
+    Performs analysis of aspect rations and
+    and returns a list of tuples (count, aspect ratio) in descending order by count
+    :param annotations: list of Annotation instances
+    :param size_factor: int, factor within a multiple of which we group objects sizes together
+    :return: list of tuples (count, aspect ratio)
+    """
+
+    sizes = [annotation.size for annotation in annotations]
+
+    # Within a small margin, force objects to be the same size, so we can see frequent sizes groups more easily
+    sizes = [get_target_shape(size, size_factor=size_factor) for size in sizes]
+
+    aspect_ratios = [width / height for (height, width) in sizes]
+    aspect_ratios = [round_to_factor(aspect_ratio, 0.2) for aspect_ratio in aspect_ratios]
+
+    aspect_ratios_counter = collections.Counter(aspect_ratios)
+    return sorted(aspect_ratios_counter.items(), key=lambda x: x[1], reverse=True)
