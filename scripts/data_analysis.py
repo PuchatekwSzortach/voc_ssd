@@ -88,22 +88,15 @@ def get_filtered_dataset_annotations(config):
     return all_annotations
 
 
-def analyze_objects_sizes(config):
+def analyze_objects_sizes(annotations):
     """
     Analyze objects sizes
-    :param config: configuration dictionary
+    :param annotations: list of Annotation instances
     """
 
-    annotations = get_filtered_dataset_annotations(config)
-    sizes = [annotation.size for annotation in annotations]
+    counts_sizes_tuples = net.utilities.get_objects_sizes_analysis(annotations, size_factor=5)
 
-    # Within a small margin, force objects to be the same size, so we can see frequent sizes groups more easily
-    sizes = [net.utilities.get_target_shape(size, size_factor=5) for size in sizes]
-
-    sizes_counter = collections.Counter(sizes)
-    ordered_sizes = sorted(sizes_counter.items(), key=lambda x: x[1], reverse=True)
-
-    for size, count in ordered_sizes[:500]:
+    for count, size in counts_sizes_tuples[:100]:
         print("{} -> {}".format(count, size))
 
 
@@ -154,11 +147,13 @@ def main():
         config = yaml.safe_load(file)
 
     # analyze_images_sizes(config)
-    analyze_objects_sizes(config)
 
-    logger = net.utilities.get_logger(config["log_path"])
+    annotations = get_filtered_dataset_annotations(config)
+    analyze_objects_sizes(annotations)
 
-    analyze_objects_aspect_ratios(logger, config)
+    # logger = net.utilities.get_logger(config["log_path"])
+    #
+    # analyze_objects_aspect_ratios(logger, config)
 
 
 if __name__ == "__main__":
