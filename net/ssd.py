@@ -20,6 +20,8 @@ class DefaultBoxesFactory:
 
         self.model_configuration = model_configuration
 
+        self.cache = {}
+
     def get_default_boxes_matrix(self, image_shape):
         """
         Gets default boxes matrix for whole SSD model - made out of concatenations of
@@ -28,16 +30,22 @@ class DefaultBoxesFactory:
         :return: 2D numpy array
         """
 
-        default_boxes_matrices = []
+        # If no cached matrix is present, compute one and store it in cache
+        if image_shape not in self.cache.keys():
 
-        for prediction_head in self.model_configuration["prediction_heads_order"]:
+            default_boxes_matrices = []
 
-            single_head_default_boxes_matrix = self.get_default_boxes_matrix_for_single_prediction_head(
-                self.model_configuration[prediction_head], image_shape)
+            for prediction_head in self.model_configuration["prediction_heads_order"]:
 
-            default_boxes_matrices.append(single_head_default_boxes_matrix)
+                single_head_default_boxes_matrix = self.get_default_boxes_matrix_for_single_prediction_head(
+                    self.model_configuration[prediction_head], image_shape)
 
-        return np.concatenate(default_boxes_matrices)
+                default_boxes_matrices.append(single_head_default_boxes_matrix)
+
+            self.cache[image_shape] = np.concatenate(default_boxes_matrices)
+
+        # Serve matrix from cache
+        return self.cache[image_shape]
 
     @staticmethod
     def get_default_boxes_matrix_for_single_prediction_head(configuration, image_shape):
