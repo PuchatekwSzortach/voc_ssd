@@ -46,8 +46,8 @@ def analyse_theoretical_performance(config):
 
     print("Theoretical recall: {}".format(theoretical_recall))
 
-    # Analyze what sizes didn't get detected
-    # Analyze what aspect ratios didn't get detected
+    # Analyze failures
+    net.utilities.analyze_annotations(unmatched_annotations)
 
 
 def main():

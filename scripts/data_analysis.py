@@ -10,8 +10,6 @@ import collections
 import yaml
 import tqdm
 import xmltodict
-import matplotlib.pyplot as plt
-import vlogging
 
 import net.data
 import net.utilities
@@ -57,7 +55,7 @@ def get_filtered_dataset_annotations(config):
     """
 
     images_filenames = net.data.get_dataset_filenames(
-        config["voc"]["data_directory"], config["voc"]["train_and_validation_set_path"])
+        config["voc"]["data_directory"], config["voc"]["validation_set_path"])
 
     annotations_paths = [os.path.join(config["voc"]["data_directory"], "Annotations", image_filename + ".xml")
                          for image_filename in images_filenames]
@@ -65,7 +63,9 @@ def get_filtered_dataset_annotations(config):
     all_annotations = []
 
     for annotations_path in tqdm.tqdm(annotations_paths):
+
         with open(annotations_path) as file:
+
             image_annotations_xml = xmltodict.parse(file.read())
 
             image_size = \
@@ -88,41 +88,6 @@ def get_filtered_dataset_annotations(config):
     return all_annotations
 
 
-def analyze_objects_sizes(annotations):
-    """
-    Analyze objects sizes
-    :param annotations: list of Annotation instances
-    """
-
-    counts_sizes_tuples = net.utilities.get_objects_sizes_analysis(annotations, size_factor=5)
-
-    for count, size in counts_sizes_tuples[:100]:
-        print("{} -> {}".format(count, size))
-
-
-def analyze_objects_aspect_ratios(logger, annotations):
-    """
-    Analyze objects aspect ratios
-    :param logger: logger instance
-    :param annotations: list of Annotation instances
-    """
-
-    ordered_aspect_ratios_counter = net.utilities.get_objects_aspect_ratios_analysis(annotations, size_factor=5)
-
-    values = []
-    indices = []
-
-    for aspect_ratio, count in ordered_aspect_ratios_counter[:100]:
-        print("{} -> {}".format(count, aspect_ratio))
-
-        indices.append(aspect_ratio)
-        values.append(count)
-
-    figure = plt.figure()
-    plt.bar(indices, values)
-    logger.info(vlogging.VisualRecord("Aspect ratios", figure))
-
-
 def main():
     """
     Script entry point
@@ -139,10 +104,7 @@ def main():
     # analyze_images_sizes(config)
 
     annotations = get_filtered_dataset_annotations(config)
-    analyze_objects_sizes(annotations)
-
-    # logger = net.utilities.get_logger(config["log_path"])
-    # analyze_objects_aspect_ratios(logger, annotations)
+    net.utilities.analyze_annotations(annotations)
 
 
 if __name__ == "__main__":

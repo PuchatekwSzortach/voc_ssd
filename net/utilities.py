@@ -395,3 +395,22 @@ def get_objects_aspect_ratios_analysis(annotations, size_factor):
 
     aspect_ratios_counter = collections.Counter(aspect_ratios)
     return sorted(aspect_ratios_counter.items(), key=lambda x: x[1], reverse=True)
+
+
+def analyze_annotations(annotations):
+    """
+    Given list of annotations, performs sizes and aspect ratios analysis
+    :param annotations: list of Annotation instances
+    """
+
+    counts_sizes_tuples = get_objects_sizes_analysis(annotations, size_factor=5)
+
+    print("\nObjects' sizes")
+    for count, size in counts_sizes_tuples[:100]:
+        print("{} -> {}".format(count, size))
+
+    ordered_aspect_ratios_counter = get_objects_aspect_ratios_analysis(annotations, size_factor=5)
+
+    print("\nObjects' aspect ratios")
+    for aspect_ratio, count in ordered_aspect_ratios_counter[:100]:
+        print("{} -> {}".format(count, aspect_ratio))
