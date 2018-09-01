@@ -20,6 +20,8 @@ class DefaultBoxesFactory:
 
         self.model_configuration = model_configuration
 
+        self.cache = {}
+
     def get_default_boxes_matrix(self, image_shape):
         """
         Gets default boxes matrix for whole SSD model - made out of concatenations of
@@ -28,16 +30,22 @@ class DefaultBoxesFactory:
         :return: 2D numpy array
         """
 
-        default_boxes_matrices = []
+        # If no cached matrix is present, compute one and store it in cache
+        if image_shape not in self.cache.keys():
 
-        for prediction_head in self.model_configuration["predicion_heads_order"]:
+            default_boxes_matrices = []
 
-            single_head_default_boxes_matrix = self.get_default_boxes_matrix_for_single_prediction_head(
-                self.model_configuration[prediction_head], image_shape)
+            for prediction_head in self.model_configuration["prediction_heads_order"]:
 
-            default_boxes_matrices.append(single_head_default_boxes_matrix)
+                single_head_default_boxes_matrix = self.get_default_boxes_matrix_for_single_prediction_head(
+                    self.model_configuration[prediction_head], image_shape)
 
-        return np.concatenate(default_boxes_matrices)
+                default_boxes_matrices.append(single_head_default_boxes_matrix)
+
+            self.cache[image_shape] = np.concatenate(default_boxes_matrices)
+
+        # Serve matrix from cache
+        return self.cache[image_shape]
 
     @staticmethod
     def get_default_boxes_matrix_for_single_prediction_head(configuration, image_shape):
@@ -49,9 +57,32 @@ class DefaultBoxesFactory:
         """
 
         step = configuration["image_downscale_factor"]
+        base_size = configuration["base_bounding_box_size"]
 
-        half_width = configuration["base_bounding_box_size"] / 2
-        half_height = configuration["base_bounding_box_size"] / 2
+        boxes_matrices = []
+
+        for aspect_ratio in configuration["aspect_ratios"]:
+
+            boxes_matrix = DefaultBoxesFactory.get_single_configuration_boxes_matrix(
+                image_shape, step, base_size, aspect_ratio)
+
+            boxes_matrices.append(boxes_matrix)
+
+        return np.concatenate(boxes_matrices)
+
+    @staticmethod
+    def get_single_configuration_boxes_matrix(image_shape, step, base_size, aspect_ratio):
+        """
+        Gets default bounding boxes matrix for a single configuration
+        :param image_shape: tuple (height, width)
+        :param step: int, distance between neighbouring boxes
+        :param base_size: int, base box size
+        :param aspect_ratio: float, factor by which base size is multiplied to create bounding box width
+        :return: 2D numpy array
+        """
+
+        half_width = (base_size * aspect_ratio) // 2
+        half_height = base_size // 2
 
         boxes = []
 
