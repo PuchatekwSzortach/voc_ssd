@@ -21,12 +21,14 @@ class VGGishModel:
         self.input_placeholder = vgg.input
 
         self.ops_map = {
+            "block2_pool": vgg.get_layer("block2_pool").output,
             "block3_pool": vgg.get_layer("block3_pool").output,
             "block4_pool": vgg.get_layer("block4_pool").output,
             "block5_pool": vgg.get_layer("block5_pool").output,
         }
 
         self.prediction_heads = {
+            "block2_head": get_prediction_head(self.ops_map["block2_pool"], categories_count),
             "block3_head": get_prediction_head(self.ops_map["block3_pool"], categories_count)
         }
 

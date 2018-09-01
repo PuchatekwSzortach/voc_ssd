@@ -10,12 +10,32 @@ Work in progress. Please come again later.
 
 - Block 2-1 - 10x10
 - Block 2-2 - 14x14
-- Block 2-pooling - 15x15
+- Block 2-pooling - 16x16
 
 - Block 3-1 - 24x24
 - Block 3-2 - 32x32
-- Block 3-3 - 39x39
+- Block 3-3 - 40x40
 - Block 3-pooling - 44x44
+
+#### Sample fields of view for different layers of VGG network
+
+Sample fields of views after Block 1-pooling:  
+| 1 - 6 | 3 - 8 | 5 - 10 | 7 - 12 | 9 - 14 | 11 - 16 | 13 - 18 |
+
+Sample fields of views after Block 2-pooling:  
+| 1 - 16 | 5 - 20 | 9 - 24 | 13 - 28 | 17 - 32 | 21 - 36 | 25 - 40 |
 
 Sample fields of views after Block 3-pooling:  
 | 1 - 44 | 9 - 52 | 17 - 60 | 25 - 68 | 33 - 76 | 41 - 84 | 49 - 92 |
+
+
+#### Sample fields of view for different layers of ours VGGish SSD network.
+Assumes each prediction head is made of two 3x3 convolutions.
+
+Sample fields of view after Block 2-head - based on Block 2-pooling:  
+| 1 - 32 | 5 - 36 | 9 - 40 | 13 - 44 | 17 - 40 | 21 - 52 |  
+Single cell field of view: 32x32
+
+Sample fields of view after Block 3-head - based on Block 3-pooling:  
+| 1 - 76 | 9 - 84 | 17 - 92 | 25 - 100 | 33 - 108 | 41 - 116 |  
+Single cell field of view: 76x76
