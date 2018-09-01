@@ -30,7 +30,7 @@ class DefaultBoxesFactory:
 
         default_boxes_matrices = []
 
-        for prediction_head in self.model_configuration["predicion_heads_order"]:
+        for prediction_head in self.model_configuration["prediction_heads_order"]:
 
             single_head_default_boxes_matrix = self.get_default_boxes_matrix_for_single_prediction_head(
                 self.model_configuration[prediction_head], image_shape)
@@ -49,9 +49,32 @@ class DefaultBoxesFactory:
         """
 
         step = configuration["image_downscale_factor"]
+        base_size = configuration["base_bounding_box_size"]
 
-        half_width = configuration["base_bounding_box_size"] / 2
-        half_height = configuration["base_bounding_box_size"] / 2
+        boxes_matrices = []
+
+        for aspect_ratio in configuration["aspect_ratios"]:
+
+            boxes_matrix = DefaultBoxesFactory.get_single_configuration_boxes_matrix(
+                image_shape, step, base_size, aspect_ratio)
+
+            boxes_matrices.append(boxes_matrix)
+
+        return np.concatenate(boxes_matrices)
+
+    @staticmethod
+    def get_single_configuration_boxes_matrix(image_shape, step, base_size, aspect_ratio):
+        """
+        Gets default bounding boxes matrix for a single configuration
+        :param image_shape: tuple (height, width)
+        :param step: int, distance between neighbouring boxes
+        :param base_size: int, base box size
+        :param aspect_ratio: float, factor by which base size is multiplied to create bounding box width
+        :return: 2D numpy array
+        """
+
+        half_width = (base_size * aspect_ratio) // 2
+        half_height = base_size // 2
 
         boxes = []
 
