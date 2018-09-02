@@ -81,8 +81,8 @@ class DefaultBoxesFactory:
         :return: 2D numpy array
         """
 
-        half_width = (base_size * aspect_ratio) // 2
-        half_height = base_size // 2
+        half_width = (base_size * aspect_ratio) / 2
+        half_height = base_size / 2
 
         boxes = []
 
