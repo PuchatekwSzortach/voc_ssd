@@ -30,22 +30,30 @@ dependencies:
   - zlib=1.2.11=ha838bed_2
   - opencv3=3.1.0=py36_0
   - pip:
+    - absl-py==0.4.1
+    - astor==0.7.1
     - astroid==2.0.4
     - atomicwrites==1.1.5
     - attrs==18.1.0
     - backcall==0.1.0
     - chardet==3.0.4
     - colorama==0.3.9
+    - cycler==0.10.0
     - decorator==4.3.0
     - flake8==3.5.0
     - flake8-polyfill==1.0.2
+    - gast==0.2.0
+    - grpcio==1.14.2
     - idna==2.7
     - ipython==6.5.0
     - ipython-genutils==0.2.0
     - isort==4.3.4
     - jedi==0.12.1
+    - kiwisolver==1.0.1
     - lazy-object-proxy==1.3.1
     - mando==0.6.4
+    - markdown==2.6.11
+    - matplotlib==2.2.3
     - mccabe==0.6.1
     - more-itertools==4.3.0
     - parso==0.3.1
@@ -54,24 +62,32 @@ dependencies:
     - pillow==5.2.0
     - pluggy==0.7.1
     - prompt-toolkit==1.0.15
+    - protobuf==3.6.1
     - ptyprocess==0.6.0
     - py==1.5.4
     - pycodestyle==2.4.0
     - pyflakes==1.6.0
     - pygments==2.2.0
     - pylint==2.1.1
+    - pyparsing==2.2.0
     - pytest==3.7.2
+    - python-dateutil==2.7.3
+    - pytz==2018.5
     - pyyaml==3.13
     - radon==2.2.0
     - requests==2.19.1
     - simplegeneric==0.8.1
     - six==1.11.0
+    - tensorboard==1.10.0
+    - tensorflow-gpu==1.10.1
+    - termcolor==1.1.0
     - tqdm==4.25.0
     - traitlets==4.3.2
     - typed-ast==1.1.0
     - urllib3==1.23
     - visual-logging==1.0
     - wcwidth==0.1.7
+    - werkzeug==0.14.1
     - wrapt==1.10.11
     - xenon==0.5.4
     - xmltodict==0.11.0

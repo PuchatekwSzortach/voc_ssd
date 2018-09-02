@@ -81,18 +81,23 @@ class DefaultBoxesFactory:
         :return: 2D numpy array
         """
 
-        half_width = (base_size * aspect_ratio) // 2
-        half_height = base_size // 2
+        # First get a vector of centers in x and y directions
+        y_centers = np.arange(step // 2, image_shape[0], step)
+        x_centers = np.arange(step // 2, image_shape[1], step)
 
-        boxes = []
+        y_steps = len(y_centers)
+        x_steps = len(x_centers)
 
-        for y in range(step // 2, image_shape[0], step):
-            for x in range(step // 2, image_shape[1], step):
+        # Now repeat x and y centers to create (x, y) paris for each case, and cast both to column vectors
+        y_centers = np.repeat(y_centers, x_steps).reshape(-1, 1)
+        x_centers = np.tile(x_centers, y_steps).reshape(-1, 1)
 
-                box = [x - half_width, y - half_height, x + half_width, y + half_height]
-                boxes.append(box)
+        half_width = (base_size * aspect_ratio) / 2
+        half_height = base_size / 2
 
-        return np.vstack(boxes)
+        return np.concatenate(
+            [x_centers - half_width, y_centers - half_height, x_centers + half_width, y_centers + half_height],
+            axis=1)
 
 
 def get_matching_analysis_generator(ssd_model_configuration, ssd_input_generator):
