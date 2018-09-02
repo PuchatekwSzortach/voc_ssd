@@ -82,6 +82,28 @@ class Annotation:
         return "Annotation: {}, {}".format(self.label, self.bounding_box)
 
 
+class DefaultBoxDefinition:
+    """
+    Class holding definition of a default bounding box - its width, height and step to next box.
+    """
+
+    def __init__(self, width, height, step):
+        """
+        Constructor
+        :param width: float, width of the box
+        :param height: float, height of the box
+        :param step: float, distance between two neighbouring boxes
+        """
+
+        self.width = width
+        self.height = height
+        self.step = step
+
+    def __repr__(self):
+
+        return "Default box definition: {}x{}, step of {}".format(self.width, self.height, self.step)
+
+
 def get_logger(path):
     """
     Returns a logger that writes to an html page
