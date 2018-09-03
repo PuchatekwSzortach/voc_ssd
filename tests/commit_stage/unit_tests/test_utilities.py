@@ -403,3 +403,40 @@ def test_get_vectorized_intersection_over_various_overlapping_boxes():
     actual = net.utilities.get_vectorized_intersection_over_union(template_box, boxes_matrix)
 
     assert np.all(expected == actual)
+
+
+def test_default_box_definition_get_overlaps_analysis_with_itself():
+    """
+    Test default box definition's overlap analysis with itself
+    """
+
+    default_box_definition = net.utilities.DefaultBoxDefinition(width=10, height=10, step=4)
+
+    expected = {
+        "center_iou": 1,
+        "horizontal_shift_iou": 3/7,
+        "vertical_shift_iou": 3/7
+    }
+
+    actual = default_box_definition.get_overlaps(default_box_definition)
+
+    assert expected == actual
+
+
+def test_default_box_definition_get_overlaps_analysis_with_different_box():
+    """
+    Test default box definition's overlap analysis with a different default box analysis
+    """
+
+    default_box_definition = net.utilities.DefaultBoxDefinition(width=10, height=20, step=4)
+    other = net.utilities.DefaultBoxDefinition(width=20, height=10, step=4)
+
+    expected = {
+        "center_iou": 1/3,
+        "horizontal_shift_iou": 1/3,
+        "vertical_shift_iou": 1/3
+    }
+
+    actual = default_box_definition.get_overlaps(other)
+
+    assert expected == actual
