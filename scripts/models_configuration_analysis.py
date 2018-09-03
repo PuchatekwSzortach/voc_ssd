@@ -4,6 +4,7 @@ Script analyzing model's configuration, or IOUs between different bounding boxes
 
 import argparse
 import sys
+import pprint
 
 import yaml
 
@@ -27,7 +28,10 @@ def analyze_models_configuration(model_configuration):
             box_definition = net.utilities.DefaultBoxDefinition(
                 width=aspect_ratio * base_size, height=base_size, step=layer_configuration["image_downscale_factor"])
 
-            print(box_definition)
+            overlaps = box_definition.get_overlaps(box_definition)
+
+            pprint.pprint(box_definition)
+            pprint.pprint(overlaps)
 
 
 def main():
