@@ -41,7 +41,7 @@ objects_filtering:
 
 
 vggish_model_configuration:
-    prediction_heads_order: ["block2_head", "block3_head"]
+    prediction_heads_order: ["block2_head", "block3_head", "block4_head"]
     block2_head:
       image_downscale_factor: 4
       base_bounding_box_size: 25
@@ -50,3 +50,8 @@ vggish_model_configuration:
       image_downscale_factor: 8
       base_bounding_box_size: 50
       aspect_ratios: [0.4, 0.6, 1]
+    block4_head:
+      image_downscale_factor: 16
+      base_bounding_box_size: 100
+      aspect_ratios: [0.4, 0.6, 1]
+

@@ -28,6 +28,9 @@ Sample fields of views after Block 2-pooling:
 Sample fields of views after Block 3-pooling:  
 | 1 - 44 | 9 - 52 | 17 - 60 | 25 - 68 | 33 - 76 | 41 - 84 | 49 - 92 |
 
+Sample fields of views after Block 4-pooling:  
+| 1 - 100 | 17 - 116 | 33 - 132 | 49 - 148 | 65 - 164 |
+
 
 #### Sample fields of view for different layers of ours VGGish SSD network.
 Assumes each prediction head is made of two 3x3 convolutions.
@@ -39,3 +42,7 @@ Single cell field of view: 32x32
 Sample fields of view after Block 3-head - based on Block 3-pooling:  
 | 1 - 76 | 9 - 84 | 17 - 92 | 25 - 100 | 33 - 108 | 41 - 116 |  
 Single cell field of view: 76x76
+
+Sample fields of view after Block 4-head - based on Block 4-pooling:  
+| 1 - 164 | 17 - 180 | 33 - 196 | 49 - 212 | 65 - 228 |  
+Single cell field of view: 164x164
