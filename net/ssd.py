@@ -57,27 +57,43 @@ class DefaultBoxesFactory:
         """
 
         step = configuration["image_downscale_factor"]
-        base_size = configuration["base_bounding_box_size"]
 
         boxes_matrices = []
 
-        for aspect_ratio in configuration["aspect_ratios"]:
+        for base_size in configuration["base_bounding_box_sizes"]:
 
-            boxes_matrix = DefaultBoxesFactory.get_single_configuration_boxes_matrix(
-                image_shape, step, base_size, aspect_ratio)
+            # Vertical boxes
+            for aspect_ratio in configuration["aspect_ratios"]:
 
-            boxes_matrices.append(boxes_matrix)
+                width = aspect_ratio * base_size
+                height = base_size
+
+                boxes_matrix = DefaultBoxesFactory.get_single_configuration_boxes_matrix(
+                    image_shape, step, width, height)
+
+                boxes_matrices.append(boxes_matrix)
+
+            # Horizontal boxes
+            for aspect_ratio in configuration["aspect_ratios"]:
+
+                width = base_size
+                height = aspect_ratio * base_size
+
+                boxes_matrix = DefaultBoxesFactory.get_single_configuration_boxes_matrix(
+                    image_shape, step, width, height)
+
+                boxes_matrices.append(boxes_matrix)
 
         return np.concatenate(boxes_matrices)
 
     @staticmethod
-    def get_single_configuration_boxes_matrix(image_shape, step, base_size, aspect_ratio):
+    def get_single_configuration_boxes_matrix(image_shape, step, width, height):
         """
         Gets default bounding boxes matrix for a single configuration
         :param image_shape: tuple (height, width)
         :param step: int, distance between neighbouring boxes
-        :param base_size: int, base box size
-        :param aspect_ratio: float, factor by which base size is multiplied to create bounding box width
+        :param width: float, box width
+        :param height: float, box height
         :return: 2D numpy array
         """
 
@@ -92,8 +108,8 @@ class DefaultBoxesFactory:
         y_centers = np.repeat(y_centers, x_steps).reshape(-1, 1)
         x_centers = np.tile(x_centers, y_steps).reshape(-1, 1)
 
-        half_width = (base_size * aspect_ratio) / 2
-        half_height = base_size / 2
+        half_width = width / 2
+        half_height = height / 2
 
         return np.concatenate(
             [x_centers - half_width, y_centers - half_height, x_centers + half_width, y_centers + half_height],

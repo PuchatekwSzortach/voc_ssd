@@ -82,6 +82,53 @@ class Annotation:
         return "Annotation: {}, {}".format(self.label, self.bounding_box)
 
 
+class DefaultBoxDefinition:
+    """
+    Class holding definition of a default bounding box - its width, height and step to next box.
+    """
+
+    def __init__(self, width, height, step):
+        """
+        Constructor
+        :param width: float, width of the box
+        :param height: float, height of the box
+        :param step: float, distance between two neighbouring boxes
+        """
+
+        self.width = width
+        self.height = height
+        self.step = step
+
+    def __repr__(self):
+
+        return "Default box definition: {}x{}, step of {}".format(self.width, self.height, self.step)
+
+    def get_overlaps(self, other):
+        """
+        Computes intersection over union with other box definition placed at three different positions -
+        centered same as self, moved by other box definitions's steps away from self's center horizontally,
+        moved by other box definitions's steps away from self's center vertically
+        :param other: DefaultBoxDefinition instance
+        :return: dictionary with keys: center_iou, horizontal_shift_iou, vertical_shift_iou
+        """
+
+        template_box = [-self.width/2, -self.height/2, self.width/2, self.height/2]
+
+        other_boxes = np.array([
+            [-other.width/2, -other.height/2, other.width/2, other.height/2],
+            [(-other.width/2) + other.step, -other.height/2, (other.width/2) + other.step, other.height/2],
+            [-other.width/2, (-other.height/2) + other.step, other.width/2, (other.height/2) + other.step]
+        ])
+
+        ious = get_vectorized_intersection_over_union(template_box, other_boxes)
+
+        return {
+            "center_iou": ious[0],
+            "horizontal_shift_iou": ious[1],
+            "vertical_shift_iou": ious[2],
+        }
+
+
 def get_logger(path):
     """
     Returns a logger that writes to an html page

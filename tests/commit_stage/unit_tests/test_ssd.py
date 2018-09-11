@@ -15,8 +15,8 @@ def test_get_single_configuration_boxes_matrix_square_boxes():
 
     image_shape = 4, 8
     step = 2
-    base_size = 4
-    aspect_ratio = 1
+    width = 4
+    height = 4
 
     expected = np.array([
         [-1, -1, 3, 3],
@@ -30,7 +30,7 @@ def test_get_single_configuration_boxes_matrix_square_boxes():
     ])
 
     actual = net.ssd.DefaultBoxesFactory.get_single_configuration_boxes_matrix(
-        image_shape, step, base_size, aspect_ratio)
+        image_shape, step, width, height)
 
     assert np.all(expected == actual)
 
@@ -43,8 +43,8 @@ def test_get_single_configuration_boxes_matrix_boxes_height_lower_than_width():
 
     image_shape = 12, 8
     step = 4
-    base_size = 4
-    aspect_ratio = 2
+    width = 8
+    height = 4
 
     # Boxes should have width of 8 and height of 4
     expected = np.array([
@@ -57,6 +57,6 @@ def test_get_single_configuration_boxes_matrix_boxes_height_lower_than_width():
     ])
 
     actual = net.ssd.DefaultBoxesFactory.get_single_configuration_boxes_matrix(
-        image_shape, step, base_size, aspect_ratio)
+        image_shape, step, width, height)
 
     assert np.all(expected == actual)
