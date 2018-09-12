@@ -21,17 +21,37 @@ def analyze_models_configuration(model_configuration):
 
         layer_configuration = model_configuration[prediction_layer]
 
-        for aspect_ratio in layer_configuration["aspect_ratios"]:
+        for base_size in layer_configuration["base_bounding_box_sizes"]:
 
-            base_size = layer_configuration["base_bounding_box_size"]
+            # Vertical boxes
+            for aspect_ratio in layer_configuration["aspect_ratios"]:
 
-            box_definition = net.utilities.DefaultBoxDefinition(
-                width=aspect_ratio * base_size, height=base_size, step=layer_configuration["image_downscale_factor"])
+                width = aspect_ratio * base_size
+                height = base_size
 
-            overlaps = box_definition.get_overlaps(box_definition)
+                box_definition = net.utilities.DefaultBoxDefinition(
+                    width=width, height=height, step=layer_configuration["image_downscale_factor"])
 
-            pprint.pprint(box_definition)
-            pprint.pprint(overlaps)
+                overlaps = box_definition.get_overlaps(box_definition)
+
+                pprint.pprint(box_definition)
+                pprint.pprint(overlaps)
+                print()
+
+            # Horizontal boxes
+            for aspect_ratio in layer_configuration["aspect_ratios"]:
+
+                width = base_size
+                height = aspect_ratio * base_size
+
+                box_definition = net.utilities.DefaultBoxDefinition(
+                    width=width, height=height, step=layer_configuration["image_downscale_factor"])
+
+                overlaps = box_definition.get_overlaps(box_definition)
+
+                pprint.pprint(box_definition)
+                pprint.pprint(overlaps)
+                print()
 
 
 def main():
