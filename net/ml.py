@@ -30,7 +30,8 @@ class VGGishModel:
         self.prediction_heads = {
             "block2_head": get_prediction_head(self.ops_map["block2_pool"], categories_count),
             "block3_head": get_prediction_head(self.ops_map["block3_pool"], categories_count),
-            "block4_head": get_prediction_head(self.ops_map["block5_pool"], categories_count)
+            "block4_head": get_prediction_head(self.ops_map["block4_pool"], categories_count),
+            "block5_head": get_prediction_head(self.ops_map["block5_pool"], categories_count)
         }
 
 
