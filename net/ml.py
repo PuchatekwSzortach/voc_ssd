@@ -5,7 +5,7 @@ Module with machine learning code
 import tensorflow as tf
 
 
-class VGGishModel:
+class VGGishNetwork:
     """
     SSD model based on VGG
     """
@@ -28,20 +28,20 @@ class VGGishModel:
         }
 
         self.prediction_heads = {
-            "block2_head": get_prediction_head(self.ops_map["block2_pool"], categories_count),
-            "block3_head": get_prediction_head(self.ops_map["block3_pool"], categories_count),
-            "block4_head": get_prediction_head(self.ops_map["block4_pool"], categories_count),
-            "block5_head": get_prediction_head(self.ops_map["block5_pool"], categories_count)
+            "block2_head": self.get_prediction_head(self.ops_map["block2_pool"], categories_count),
+            "block3_head": self.get_prediction_head(self.ops_map["block3_pool"], categories_count),
+            "block4_head": self.get_prediction_head(self.ops_map["block4_pool"], categories_count),
+            "block5_head": self.get_prediction_head(self.ops_map["block5_pool"], categories_count)
         }
 
+    @staticmethod
+    def get_prediction_head(input_op, filters_count):
+        """
+        Creates a prediction head
+        :param input_op: input tensor
+        :param filters_count: number of filters prediction head should have
+        :return: tensor op
+        """
 
-def get_prediction_head(input_op, filters_count):
-    """
-    Creates a prediction head
-    :param input_op: input tensor
-    :param filters_count: number of filters prediction head should have
-    :return: tensor op
-    """
-
-    x = tf.keras.layers.Conv2D(filters=128, kernel_size=(3, 3), padding='valid', activation='elu')(input_op)
-    return tf.keras.layers.Conv2D(filters=filters_count, kernel_size=(3, 3), padding='valid')(x)
+        x = tf.keras.layers.Conv2D(filters=128, kernel_size=(3, 3), padding='valid', activation='elu')(input_op)
+        return tf.keras.layers.Conv2D(filters=filters_count, kernel_size=(3, 3), padding='valid')(x)
