@@ -45,3 +45,27 @@ class VGGishNetwork:
 
         x = tf.keras.layers.Conv2D(filters=128, kernel_size=(3, 3), padding='valid', activation='elu')(input_op)
         return tf.keras.layers.Conv2D(filters=filters_count, kernel_size=(3, 3), padding='valid')(x)
+
+
+class VGGishModel:
+    """
+    Class that wraps VGGish network to provide training and prediction methods
+    """
+
+    def __init__(self, network):
+        """
+        Constructor
+        :param network:
+        """
+
+        self.network = network
+
+    def train(self, training_data_generator_factory, validation_data_generator_factory, configuration, callbacks=None):
+        """
+        Method for training network
+        :param training_data_generator_factory:
+        :param validation_data_generator_factory:
+        :param configuration:
+        :param callbacks:
+        :return:
+        """

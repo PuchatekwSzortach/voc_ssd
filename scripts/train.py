@@ -36,7 +36,8 @@ def main():
 
     default_boxes_factory = net.ssd.DefaultBoxesFactory(config["vggish_model_configuration"])
 
-    model = net.ml.VGGishNetwork(len(config["categories"]))
+    network = net.ml.VGGishNetwork(len(config["categories"]))
+    model = net.ml.VGGishModel(network)
 
 
 if __name__ == "__main__":
