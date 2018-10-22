@@ -13,6 +13,9 @@ import net.ml
 
 
 def main():
+    """
+    Script entry point
+    """
 
     parser = argparse.ArgumentParser()
 
@@ -38,6 +41,9 @@ def main():
 
     network = net.ml.VGGishNetwork(len(config["categories"]))
     model = net.ml.VGGishModel(network)
+
+    model.train(
+        training_input_generator_factory, validation_input_generator_factory, default_boxes_factory, config["train"])
 
 
 if __name__ == "__main__":

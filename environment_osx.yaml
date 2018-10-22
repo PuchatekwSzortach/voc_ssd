@@ -35,20 +35,20 @@ dependencies:
   - openh264=1.7.0=0
   - openssl=1.0.2p=h470a237_0
   - pcre=8.41=hfc679d8_3
+  - pip=10.0.1=py36_0
   - pixman=0.34.0=h470a237_3
+  - setuptools=40.2.0=py36_0
+  - wheel=0.31.1=py36_0
   - x264=1!152.20180717=h470a237_0
   - libcxx=4.0.1=h579ed51_0
   - libcxxabi=4.0.1=hebd6815_0
   - libedit=3.1.20170329=hb402a30_2
   - libffi=3.2.1=h475c297_4
   - ncurses=6.1=h0a44026_0
-  - pip=10.0.1=py36_0
   - python=3.6.6=hc167b69_0
   - readline=7.0=h1de35cc_5
-  - setuptools=40.2.0=py36_0
   - sqlite=3.24.0=ha441bb4_0
   - tk=8.6.8=ha441bb4_0
-  - wheel=0.31.1=py36_0
   - xz=5.2.4=h1de35cc_4
   - zlib=1.2.11=hf3cbc9b_2
   - pip:
@@ -109,5 +109,5 @@ dependencies:
     - wrapt==1.10.11
     - xenon==0.5.4
     - xmltodict==0.11.0
-prefix: /Users/kuba/anaconda3/envs/voc_ssd_environment
+prefix: /Users/Kuba/anaconda3/envs/voc_ssd_environment
 

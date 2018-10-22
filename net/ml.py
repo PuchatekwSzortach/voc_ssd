@@ -3,6 +3,7 @@ Module with machine learning code
 """
 
 import tensorflow as tf
+import tqdm
 
 
 class VGGishNetwork:
@@ -59,13 +60,51 @@ class VGGishModel:
         """
 
         self.network = network
+        self.learning_rate = None
 
-    def train(self, training_data_generator_factory, validation_data_generator_factory, configuration, callbacks=None):
+    def train(
+            self, training_data_generator_factory, validation_data_generator_factory,
+            default_boxes_factory, configuration):
         """
         Method for training network
         :param training_data_generator_factory:
+        factory for creating training data generator and inquiring about its size
         :param validation_data_generator_factory:
-        :param configuration:
-        :param callbacks:
-        :return:
+        factory for creating validation data generator and inquiring about its size
+        :param default_boxes_factory: DefaultBoxesFactory instance, creates default boxes for data from generators
+        :param configuration: dictionary with training options
         """
+
+        self.learning_rate = configuration["learning_rate"]
+        epoch_index = 0
+
+        training_data_generator = training_data_generator_factory.get_generator()
+
+        while epoch_index < configuration["epochs"]:
+
+            print("Epoch {}/{}".format(epoch_index, configuration["epochs"]))
+
+            epoch_log = {
+                "epoch_index": epoch_index,
+                "training_loss": self._train_for_one_epoch(
+                    training_data_generator, training_data_generator_factory.get_size())
+            }
+
+            print(epoch_log)
+            epoch_index += 1
+
+        # Needed once we actually start generators
+        training_data_generator_factory.stop_generator()
+        # validation_data_generator_factory.stop_generator()
+
+    def _train_for_one_epoch(self, data_generator, batches_count):
+
+        training_losses = []
+
+        # for _ in tqdm.tqdm(range(batches_count)):
+        for _ in tqdm.tqdm(range(500)):
+
+            image, annotations = next(data_generator)
+
+        return "fake training loss"
+

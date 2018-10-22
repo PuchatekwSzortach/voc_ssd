@@ -190,6 +190,13 @@ class SSDInputGeneratorFactory:
         self._samples_queue.join()
         self._samples_generation_thread.join()
 
+    def get_size(self):
+        """
+        Gets size of dataset served by the generator
+        :return: int
+        """
+        return self.voc_samples_generator_factory.get_size()
+
 
 def get_resized_objects_sizes(image_annotations, size_factor):
     """
