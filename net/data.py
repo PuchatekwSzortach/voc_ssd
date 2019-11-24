@@ -60,7 +60,7 @@ def get_objects_annotations(image_annotations):
 
 class VOCSamplesGeneratorFactory:
     """
-    Factory class creating data generator that yield (image, bounding boxes) pairs
+    Factory class creating data generator that yield (image, annotations) pairs
     """
 
     def __init__(self, data_directory, data_set_path, size_factor):
@@ -263,3 +263,144 @@ def get_resized_dataset_objects_sizes(annotations_paths, size_factor, verbose=Fa
             objects_sizes.extend(image_objects_sizes)
 
     return objects_sizes
+
+
+class DataLoader:
+    """
+    A generic loader class
+    """
+
+
+class DataBunch:
+    """
+    A simple container for training and validation generators
+    """
+
+    def __init__(self, training_data_loader, validation_data_loader):
+
+        self.training_data_loader = training_data_loader
+        self.validation_data_loader = validation_data_loader
+
+
+class VOCSamplesDataLoader:
+    """
+    Data loader that yields (image, annotations) pairs
+    """
+
+    def __init__(self, data_directory, data_set_path, size_factor):
+        """
+        Constructor
+        :param data_directory: path to VOC dataset directory
+        :param data_set_path: path to file listing images to be used - for selecting between train and validation
+        :param size_factor: size factor to which images should be rescaled
+        data sets
+        """
+
+        self.data_directory = data_directory
+        self.images_filenames = get_dataset_filenames(data_directory, data_set_path)
+        self.size_factor = size_factor
+
+    def __len__(self):
+
+        return len(self.images_filenames)
+
+    def __iter__(self):
+
+        local_images_filenames = copy.deepcopy(self.images_filenames)
+
+        while True:
+
+            random.shuffle(local_images_filenames)
+
+            for image_filename in local_images_filenames:
+
+                image_path = os.path.join(self.data_directory, "JPEGImages", image_filename + ".jpg")
+                image = cv2.imread(image_path)
+
+                annotations_path = os.path.join(self.data_directory, "Annotations", image_filename + ".xml")
+
+                with open(annotations_path) as file:
+
+                    image_annotations = xmltodict.parse(file.read())
+
+                objects_annotations = get_objects_annotations(image_annotations)
+
+                bounding_boxes = [annotation.bounding_box for annotation in objects_annotations]
+
+                image, resized_bounding_boxes = net.utilities.get_resized_sample(
+                    image, bounding_boxes, size_factor=self.size_factor)
+
+                for index, bounding_box in enumerate(resized_bounding_boxes):
+                    objects_annotations[index].bounding_box = bounding_box
+
+                yield image, objects_annotations
+
+
+class SSDModelInputDataLoader:
+    """
+    Data loader for SSD model's input that yields (image, annotations) pairs.
+    Unusually sized annotations are discarded.
+    Data is loaded on background threads.
+    """
+
+    def __init__(self, voc_samples_data_loader, objects_filtering_config):
+        """
+        Constructor
+        :param voc_samples_data_loader: VOCSamplesDataLoader instance
+        :param objects_filtering_config: dictionary with options for objects filtering
+        """
+
+        self.voc_samples_data_loader = voc_samples_data_loader
+        self.objects_filtering_config = objects_filtering_config
+
+        self._samples_queue = queue.Queue(maxsize=100)
+        self._samples_generation_thread = None
+        self._continue_generating_samples = None
+
+    def __len__(self):
+
+        return len(self.voc_samples_data_loader)
+
+    def __iter__(self):
+
+        self._continue_generating_samples = True
+
+        self._samples_generation_thread = threading.Thread(
+            target=self._samples_generation_task,
+            args=(iter(self.voc_samples_data_loader), self._samples_queue, self.objects_filtering_config))
+
+        self._samples_generation_thread.start()
+
+        while True:
+
+            sample = self._samples_queue.get()
+            self._samples_queue.task_done()
+            yield sample
+
+    def _samples_generation_task(self, voc_samples_data_generator, samples_queue, objects_filtering_config):
+
+        while self._continue_generating_samples is True:
+
+            image, annotations = next(voc_samples_data_generator)
+
+            # Discard odd sized annotations
+            annotations = \
+                [annotation for annotation in annotations
+                 if not net.utilities.is_annotation_size_unusual(annotation, **objects_filtering_config)]
+
+            sample = image, annotations
+            samples_queue.put(sample)
+
+    def stop_generator(self):
+        """
+        Signal data loading thread to finish working and purge the data queue.
+        """
+
+        self._continue_generating_samples = False
+
+        while not self._samples_queue.empty():
+            self._samples_queue.get()
+            self._samples_queue.task_done()
+
+        self._samples_queue.join()
+        self._samples_generation_thread.join()

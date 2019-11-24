@@ -25,25 +25,27 @@ def main():
     with open(arguments.config) as file:
         config = yaml.safe_load(file)
 
-    training_samples_generator_factory = net.data.VOCSamplesGeneratorFactory(
+    training_samples_loader = net.data.VOCSamplesDataLoader(
         config["voc"]["data_directory"], config["voc"]["validation_set_path"], config["size_factor"])
 
-    training_input_generator_factory = net.data.SSDInputGeneratorFactory(
-        training_samples_generator_factory, config["objects_filtering"])
+    training_input_data_loader = net.data.SSDModelInputDataLoader(training_samples_loader, config["objects_filtering"])
 
-    validation_samples_generator_factory = net.data.VOCSamplesGeneratorFactory(
+    validation_samples_loader = net.data.VOCSamplesDataLoader(
         config["voc"]["data_directory"], config["voc"]["validation_set_path"], config["size_factor"])
 
-    validation_input_generator_factory = net.data.SSDInputGeneratorFactory(
-        validation_samples_generator_factory, config["objects_filtering"])
+    validation_input_data_loader = net.data.SSDModelInputDataLoader(
+        validation_samples_loader, config["objects_filtering"])
+
+    data_bunch = net.data.DataBunch(
+        training_data_loader=training_input_data_loader,
+        validation_data_loader=validation_input_data_loader)
 
     default_boxes_factory = net.ssd.DefaultBoxesFactory(config["vggish_model_configuration"])
 
     network = net.ml.VGGishNetwork(len(config["categories"]))
     model = net.ml.VGGishModel(network)
 
-    model.train(
-        training_input_generator_factory, validation_input_generator_factory, default_boxes_factory, config["train"])
+    model.train(data_bunch, default_boxes_factory, config["train"])
 
 
 if __name__ == "__main__":

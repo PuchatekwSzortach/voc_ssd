@@ -62,15 +62,10 @@ class VGGishModel:
         self.network = network
         self.learning_rate = None
 
-    def train(
-            self, training_data_generator_factory, validation_data_generator_factory,
-            default_boxes_factory, configuration):
+    def train(self, data_bunch, default_boxes_factory, configuration):
         """
         Method for training network
-        :param training_data_generator_factory:
-        factory for creating training data generator and inquiring about its size
-        :param validation_data_generator_factory:
-        factory for creating validation data generator and inquiring about its size
+        :param data_bunch: net.data.DataBunch instance created with SSD input data loaders
         :param default_boxes_factory: DefaultBoxesFactory instance, creates default boxes for data from generators
         :param configuration: dictionary with training options
         """
@@ -78,7 +73,7 @@ class VGGishModel:
         self.learning_rate = configuration["learning_rate"]
         epoch_index = 0
 
-        training_data_generator = training_data_generator_factory.get_generator()
+        training_data_generator = iter(data_bunch.training_data_loader)
 
         while epoch_index < configuration["epochs"]:
 
@@ -87,14 +82,14 @@ class VGGishModel:
             epoch_log = {
                 "epoch_index": epoch_index,
                 "training_loss": self._train_for_one_epoch(
-                    training_data_generator, training_data_generator_factory.get_size())
+                    training_data_generator, len(data_bunch.training_data_loader))
             }
 
             print(epoch_log)
             epoch_index += 1
 
         # Needed once we actually start generators
-        training_data_generator_factory.stop_generator()
+        data_bunch.training_data_loader.stop_generator()
         # validation_data_generator_factory.stop_generator()
 
     def _train_for_one_epoch(self, data_generator, batches_count):

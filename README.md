@@ -54,3 +54,16 @@ Single cell field of view: 164x164
 Sample fields of view after Block 5-head - based on Block 5-pooling:  
 | 1 - 340 | 33 - 372 | 65 - 404 | 97 - 436 | 129 - 468 |  
 Single cell field of view: 340x340
+
+#### VOC data analysis
+
+Objects sizes and aspect ratios can be computed with
+```
+
+python ./scripts/data_analysis.py --config=./config.yaml
+```
+
+In short object sizes span from (20, 20) to (500, 500), but over 70% of objects are in (20, 20) ~ (50, 50) range. Only about 9% of objects are above (100, 100).
+
+Most objects have aspect ration in (0.2, 3.0) range. Tail contains aspect ratios in (0.2, 5.0) range.
+
