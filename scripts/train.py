@@ -26,7 +26,7 @@ def main():
         config = yaml.safe_load(file)
 
     training_samples_loader = net.data.VOCSamplesDataLoader(
-        config["voc"]["data_directory"], config["voc"]["validation_set_path"], config["size_factor"])
+        config["voc"]["data_directory"], config["voc"]["train_set_path"], config["size_factor"])
 
     training_input_data_loader = net.data.SSDModelInputDataLoader(training_samples_loader, config["objects_filtering"])
 

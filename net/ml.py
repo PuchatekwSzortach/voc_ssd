@@ -94,12 +94,11 @@ class VGGishModel:
 
     def _train_for_one_epoch(self, data_generator, batches_count):
 
-        training_losses = []
+        # training_losses = []
 
         # for _ in tqdm.tqdm(range(batches_count)):
-        for _ in tqdm.tqdm(range(500)):
-
-            image, annotations = next(data_generator)
+        # for _ in tqdm.tqdm(range(500)):
+        #
+        #     image, annotations = next(data_generator)
 
         return "fake training loss"
-

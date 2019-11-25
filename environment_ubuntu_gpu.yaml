@@ -16,18 +16,21 @@ dependencies:
   - mkl_fft=1.0.4=py36h4414c95_1
   - mkl_random=1.0.1=py36h4414c95_1
   - ncurses=6.1=hf484d3e_0
+  - numpy=1.15.0=py36h1b885b7_0
   - numpy-base=1.15.0=py36h3dfced4_0
-  - opencv3=3.1.0=py36_0
   - openssl=1.0.2p=h14c3975_0
+  - pip=10.0.1=py36_0
   - python=3.6.6=hc3d631a_0
   - readline=7.0=ha6073c6_4
+  - setuptools=40.0.0=py36_0
   - sqlite=3.24.0=h84994c4_0
   - tk=8.6.7=hc745277_3
   - wheel=0.31.1=py36_0
   - xz=5.2.4=h14c3975_4
   - zlib=1.2.11=ha838bed_2
+  - opencv3=3.1.0=py36_0
   - pip:
-    - absl-py==0.8.1
+    - absl-py==0.4.1
     - astor==0.7.1
     - astroid==2.0.4
     - atomicwrites==1.1.5
@@ -40,16 +43,12 @@ dependencies:
     - flake8==3.5.0
     - flake8-polyfill==1.0.2
     - gast==0.2.0
-    - google-pasta==0.1.8
     - grpcio==1.14.2
-    - h5py==2.10.0
     - idna==2.7
     - ipython==6.5.0
     - ipython-genutils==0.2.0
     - isort==4.3.4
     - jedi==0.12.1
-    - keras-applications==1.0.8
-    - keras-preprocessing==1.1.0
     - kiwisolver==1.0.1
     - lazy-object-proxy==1.3.1
     - mando==0.6.4
@@ -57,12 +56,10 @@ dependencies:
     - matplotlib==2.2.3
     - mccabe==0.6.1
     - more-itertools==4.3.0
-    - numpy==1.14.5
     - parso==0.3.1
     - pexpect==4.6.0
     - pickleshare==0.7.4
     - pillow==5.2.0
-    - pip==18.0
     - pluggy==0.7.1
     - prompt-toolkit==1.0.15
     - protobuf==3.6.1
@@ -79,12 +76,10 @@ dependencies:
     - pyyaml==3.13
     - radon==2.2.0
     - requests==2.19.1
-    - setuptools==42.0.0
     - simplegeneric==0.8.1
     - six==1.11.0
-    - tensorboard==1.14.0
-    - tensorflow-estimator==1.14.0
-    - tensorflow-gpu==1.14.0
+    - tensorboard==1.10.0
+    - tensorflow-gpu==1.10.1
     - termcolor==1.1.0
     - tqdm==4.25.0
     - traitlets==4.3.2
@@ -93,7 +88,7 @@ dependencies:
     - visual-logging==1.0
     - wcwidth==0.1.7
     - werkzeug==0.14.1
-    - wrapt==1.11.2
+    - wrapt==1.10.11
     - xenon==0.5.4
     - xmltodict==0.11.0
 prefix: /home/kuba/anaconda3/envs/voc_ssd_environment
