@@ -207,22 +207,18 @@ class VOCSamplesDataLoader:
                 yield image, objects_annotations
 
 
-class SSDModelInputDataLoader:
+class BackgroundDataLoader:
     """
-    Data loader for SSD model's input that yields (image, annotations) pairs.
-    Unusually sized annotations are discarded.
-    Data is loaded on background threads.
+    Data loader that loads data in the background, passing it to foreground through a queue
     """
 
-    def __init__(self, voc_samples_data_loader, objects_filtering_config):
+    def __init__(self, data_loader):
         """
         Constructor
-        :param voc_samples_data_loader: VOCSamplesDataLoader instance
-        :param objects_filtering_config: dictionary with options for objects filtering
+        :param data_loader: data_loader instance which from which data will be loaded in the background
         """
 
-        self.voc_samples_data_loader = voc_samples_data_loader
-        self.objects_filtering_config = objects_filtering_config
+        self.data_loader = data_loader
 
         self._samples_queue = queue.Queue(maxsize=100)
         self._samples_generation_thread = None
@@ -230,7 +226,7 @@ class SSDModelInputDataLoader:
 
     def __len__(self):
 
-        return len(self.voc_samples_data_loader)
+        return len(self.data_loader)
 
     def __iter__(self):
 
@@ -238,7 +234,7 @@ class SSDModelInputDataLoader:
 
         self._samples_generation_thread = threading.Thread(
             target=self._samples_generation_task,
-            args=(iter(self.voc_samples_data_loader), self._samples_queue, self.objects_filtering_config))
+            args=(iter(self.data_loader), self._samples_queue))
 
         self._samples_generation_thread.start()
 
@@ -248,18 +244,11 @@ class SSDModelInputDataLoader:
             self._samples_queue.task_done()
             yield sample
 
-    def _samples_generation_task(self, voc_samples_data_generator, samples_queue, objects_filtering_config):
+    def _samples_generation_task(self, data_generator, samples_queue):
 
         while self._continue_generating_samples is True:
 
-            image, annotations = next(voc_samples_data_generator)
-
-            # Discard odd sized annotations
-            annotations = \
-                [annotation for annotation in annotations
-                 if not net.utilities.is_annotation_size_unusual(annotation, **objects_filtering_config)]
-
-            sample = image, annotations
+            sample = next(data_generator)
             samples_queue.put(sample)
 
     def stop_generator(self):
