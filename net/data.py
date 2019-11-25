@@ -147,18 +147,22 @@ class VOCSamplesDataLoader:
     Data loader that yields (image, annotations) pairs
     """
 
-    def __init__(self, data_directory, data_set_path, size_factor):
+    def __init__(self, data_directory, data_set_path, size_factor, objects_filtering_config=None):
         """
         Constructor
         :param data_directory: path to VOC dataset directory
         :param data_set_path: path to file listing images to be used - for selecting between train and validation
         :param size_factor: size factor to which images should be rescaled
         data sets
+        :param objects_filtering_config: dictionary, defaults to None. If provided, data loader
+        will drop annotations based on filtering options
         """
 
         self.data_directory = data_directory
         self.images_filenames = get_dataset_filenames(data_directory, data_set_path)
         self.size_factor = size_factor
+
+        self.objects_filtering_config = objects_filtering_config
 
     def __len__(self):
 
@@ -184,6 +188,13 @@ class VOCSamplesDataLoader:
                     image_annotations = xmltodict.parse(file.read())
 
                 objects_annotations = get_objects_annotations(image_annotations)
+
+                if self.objects_filtering_config is not None:
+
+                    # Discard odd sized annotations
+                    objects_annotations = \
+                        [annotation for annotation in objects_annotations
+                         if not net.utilities.is_annotation_size_unusual(annotation, **self.objects_filtering_config)]
 
                 bounding_boxes = [annotation.bounding_box for annotation in objects_annotations]
 

@@ -154,9 +154,10 @@ def log_default_boxes_matches(logger, config):
     """
 
     samples_loader = net.data.VOCSamplesDataLoader(
-        config["voc"]["data_directory"], config["voc"]["validation_set_path"], config["size_factor"])
-
-    ssd_input_data_loader = net.data.SSDModelInputDataLoader(samples_loader, config["objects_filtering"])
+        data_directory=config["voc"]["data_directory"],
+        data_set_path=config["voc"]["validation_set_path"],
+        size_factor=config["size_factor"],
+        objects_filtering_config=config["objects_filtering"])
 
     default_boxes_factory = net.ssd.DefaultBoxesFactory(config["vggish_model_configuration"])
     categories_to_colors_map = net.utilities.get_categories_to_colors_map(config["categories"])
@@ -164,9 +165,7 @@ def log_default_boxes_matches(logger, config):
     for _ in tqdm.tqdm(range(100)):
 
         log_default_boxes_matches_for_single_sample(
-            logger, iter(ssd_input_data_loader), default_boxes_factory, categories_to_colors_map, config["font_path"])
-
-    ssd_input_data_loader.stop_generator()
+            logger, iter(samples_loader), default_boxes_factory, categories_to_colors_map, config["font_path"])
 
 
 def main():

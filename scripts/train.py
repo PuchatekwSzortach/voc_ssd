@@ -26,19 +26,20 @@ def main():
         config = yaml.safe_load(file)
 
     training_samples_loader = net.data.VOCSamplesDataLoader(
-        config["voc"]["data_directory"], config["voc"]["train_set_path"], config["size_factor"])
-
-    training_input_data_loader = net.data.SSDModelInputDataLoader(training_samples_loader, config["objects_filtering"])
+        data_directory=config["voc"]["data_directory"],
+        data_set_path=config["voc"]["train_set_path"],
+        size_factor=config["size_factor"],
+        objects_filtering_config=config["objects_filtering"])
 
     validation_samples_loader = net.data.VOCSamplesDataLoader(
-        config["voc"]["data_directory"], config["voc"]["validation_set_path"], config["size_factor"])
-
-    validation_input_data_loader = net.data.SSDModelInputDataLoader(
-        validation_samples_loader, config["objects_filtering"])
+        data_directory=config["voc"]["data_directory"],
+        data_set_path=config["voc"]["validation_set_path"],
+        size_factor=config["size_factor"],
+        objects_filtering_config=config["objects_filtering"])
 
     data_bunch = net.data.DataBunch(
-        training_data_loader=training_input_data_loader,
-        validation_data_loader=validation_input_data_loader)
+        training_data_loader=training_samples_loader,
+        validation_data_loader=validation_samples_loader)
 
     default_boxes_factory = net.ssd.DefaultBoxesFactory(config["vggish_model_configuration"])
 

@@ -89,7 +89,7 @@ class VGGishModel:
             epoch_index += 1
 
         # Needed once we actually start generators
-        data_bunch.training_data_loader.stop_generator()
+        # data_bunch.training_data_loader.stop_generator()
         # validation_data_generator_factory.stop_generator()
 
     def _train_for_one_epoch(self, data_generator, batches_count):

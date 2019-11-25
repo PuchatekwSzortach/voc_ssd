@@ -19,25 +19,23 @@ def analyse_theoretical_performance(config):
     """
 
     voc_samples_loader = net.data.VOCSamplesDataLoader(
-        config["voc"]["data_directory"], config["voc"]["validation_set_path"], config["size_factor"])
-
-    ssd_moden_input_data_loader = net.data.SSDModelInputDataLoader(
-        voc_samples_loader, config["objects_filtering"])
+        data_directory=config["voc"]["data_directory"],
+        data_set_path=config["voc"]["validation_set_path"],
+        size_factor=config["size_factor"],
+        objects_filtering_config=config["objects_filtering"])
 
     matching_analysis_generator = net.ssd.get_matching_analysis_generator(
-        config["vggish_model_configuration"], iter(ssd_moden_input_data_loader))
+        config["vggish_model_configuration"], iter(voc_samples_loader))
 
     matched_annotations = []
     unmatched_annotations = []
 
-    for _ in tqdm.tqdm(range(len(ssd_moden_input_data_loader))):
+    for _ in tqdm.tqdm(range(len(voc_samples_loader))):
 
         single_image_matched_annotations, single_image_unmatched_annotations = next(matching_analysis_generator)
 
         matched_annotations.extend(single_image_matched_annotations)
         unmatched_annotations.extend(single_image_unmatched_annotations)
-
-    ssd_moden_input_data_loader.stop_generator()
 
     theoretical_recall = len(matched_annotations) / (len(matched_annotations) + len(unmatched_annotations))
 
