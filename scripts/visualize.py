@@ -20,8 +20,10 @@ def log_voc_samples_generator_output(logger, config):
     Logs voc samples generator output
     """
 
-    generator = net.data.VOCSamplesGeneratorFactory(
-        config["voc"]["data_directory"], config["voc"]["validation_set_path"], config["size_factor"]).get_generator()
+    samples_loader = net.data.VOCSamplesDataLoader(
+        config["voc"]["data_directory"], config["voc"]["validation_set_path"], config["size_factor"])
+
+    generator = iter(samples_loader)
 
     categories_to_colors_map = net.utilities.get_categories_to_colors_map(config["categories"])
 
@@ -72,17 +74,17 @@ def log_samples_with_odd_sized_annotations(logger, config):
     Logs images with objects of odd sizes - suspiciously small, strange aspect ratios, etc
     """
 
-    generator_factory = net.data.VOCSamplesGeneratorFactory(
+    samples_loader = net.data.VOCSamplesDataLoader(
         config["voc"]["data_directory"], config["voc"]["validation_set_path"], config["size_factor"])
 
-    generator = generator_factory.get_generator()
+    generator = iter(samples_loader)
 
     categories_to_colors_map = net.utilities.get_categories_to_colors_map(config["categories"])
 
     all_annotations_count = 0
     unusual_sized_annotation_count = 0
 
-    for _ in tqdm.tqdm(range(generator_factory.get_size())):
+    for _ in tqdm.tqdm(range(len(samples_loader))):
 
         image, annotations = next(generator)
 
@@ -151,13 +153,11 @@ def log_default_boxes_matches(logger, config):
     Log default boxes matches
     """
 
-    voc_samples_generator_factory = net.data.VOCSamplesGeneratorFactory(
-        config["voc"]["data_directory"], config["voc"]["validation_set_path"], config["size_factor"])
-
-    ssd_input_generator_factory = net.data.SSDInputGeneratorFactory(
-        voc_samples_generator_factory, config["objects_filtering"])
-
-    ssd_input_generator = ssd_input_generator_factory.get_generator()
+    samples_loader = net.data.VOCSamplesDataLoader(
+        data_directory=config["voc"]["data_directory"],
+        data_set_path=config["voc"]["validation_set_path"],
+        size_factor=config["size_factor"],
+        objects_filtering_config=config["objects_filtering"])
 
     default_boxes_factory = net.ssd.DefaultBoxesFactory(config["vggish_model_configuration"])
     categories_to_colors_map = net.utilities.get_categories_to_colors_map(config["categories"])
@@ -165,9 +165,7 @@ def log_default_boxes_matches(logger, config):
     for _ in tqdm.tqdm(range(100)):
 
         log_default_boxes_matches_for_single_sample(
-            logger, ssd_input_generator, default_boxes_factory, categories_to_colors_map, config["font_path"])
-
-    ssd_input_generator_factory.stop_generator()
+            logger, iter(samples_loader), default_boxes_factory, categories_to_colors_map, config["font_path"])
 
 
 def main():

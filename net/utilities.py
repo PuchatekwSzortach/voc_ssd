@@ -461,3 +461,17 @@ def analyze_annotations(annotations):
     print("\nObjects' aspect ratios")
     for aspect_ratio, count in ordered_aspect_ratios_counter[:100]:
         print("{} -> {}".format(count, aspect_ratio))
+
+    annotations_over_large_size = []
+    annotations_below_small_size = []
+
+    for count, size_tuple in counts_sizes_tuples:
+
+        if max(size_tuple) > 100:
+            annotations_over_large_size.append(count)
+
+        if max(size_tuple) < 50:
+            annotations_below_small_size.append(count)
+
+    print("Above large size ratio: {}".format(sum(annotations_over_large_size) / len(annotations)))
+    print("Below small size ratio: {}".format(sum(annotations_below_small_size) / len(annotations)))

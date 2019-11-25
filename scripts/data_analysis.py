@@ -106,6 +106,8 @@ def main():
     annotations = get_filtered_dataset_annotations(config)
     net.utilities.analyze_annotations(annotations)
 
+    print("Total annotations: {}".format(len(annotations)))
+
 
 if __name__ == "__main__":
 

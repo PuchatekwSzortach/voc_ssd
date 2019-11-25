@@ -59,3 +59,7 @@ vggish_model_configuration:
       base_bounding_box_sizes: [300, 150]
       aspect_ratios: [0.4, 0.6, 1]
 
+
+train:
+  epochs: 2
+  learning_rate: 0.001
