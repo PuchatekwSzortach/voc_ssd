@@ -5,6 +5,7 @@ Script to train SSD model
 import argparse
 import sys
 
+import tensorflow as tf
 import yaml
 
 import net.data
@@ -62,16 +63,20 @@ def main():
 
     data_bunch = get_ssd_training_loop_data_bunch(config)
 
-    iterator = iter(data_bunch.training_data_loader)
+    network = net.ml.VGGishNetwork(
+        model_configuration=config["vggish_model_configuration"],
+        categories_count=len(config["categories"]))
 
-    for _ in range(5):
+    initialized_variables = tf.global_variables()
 
-        _, matched_samples_indices = next(iterator)
-        print(matched_samples_indices)
-        print(len(matched_samples_indices))
-        print(matched_samples_indices.dtype)
+    session = tf.keras.backend.get_session()
 
-    data_bunch.training_data_loader.stop_generator()
+    model = net.ml.VGGishModel(session, network)
+
+    uninitialized_variables = set(tf.global_variables()).difference(initialized_variables)
+    session.run(tf.variables_initializer(uninitialized_variables))
+
+    model.train(data_bunch, config["train"])
 
 
 if __name__ == "__main__":
