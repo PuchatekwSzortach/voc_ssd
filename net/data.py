@@ -125,12 +125,6 @@ def get_resized_dataset_objects_sizes(annotations_paths, size_factor, verbose=Fa
     return objects_sizes
 
 
-class DataLoader:
-    """
-    A generic loader class
-    """
-
-
 class DataBunch:
     """
     A simple container for training and validation generators

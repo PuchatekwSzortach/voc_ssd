@@ -149,3 +149,43 @@ def get_matching_analysis_generator(ssd_model_configuration, ssd_input_generator
                 unmatched_annotations.append(annotation)
 
         yield matched_annotations, unmatched_annotations
+
+
+class SSDTrainingLoopDataLoader:
+    """
+    Data loader class that outputs (image, indices of default boxes that matched annotations in image),
+    or data suitable for training and evaluating SSD network
+    """
+
+    def __init__(self, voc_samples_data_loader, ssd_model_configuration):
+        """
+        Constructor
+        :param voc_samples_data_loader: net.data.VOCSamplesDataLoader instance
+        """
+
+        self.voc_samples_data_loader = voc_samples_data_loader
+
+        self.default_boxes_factory = DefaultBoxesFactory(ssd_model_configuration)
+
+    def __len__(self):
+        return len(self.voc_samples_data_loader)
+
+    def __iter__(self):
+        iterator = iter(self.voc_samples_data_loader)
+
+        while True:
+
+            image, annotations = next(iterator)
+            default_boxes_matrix = self.default_boxes_factory.get_default_boxes_matrix(image.shape)
+
+            matched_default_boxes_indices_set = set()
+
+            for annotation in annotations:
+
+                matched_default_boxes_indices = net.utilities.get_matched_boxes_indices(
+                    annotation.bounding_box, default_boxes_matrix)
+
+                matched_default_boxes_indices_set.update(matched_default_boxes_indices)
+
+            # sorted() both sorts data and casts set into list, which can be converted to numpy array
+            yield image, np.array(sorted(matched_default_boxes_indices_set)).astype(np.int32)
