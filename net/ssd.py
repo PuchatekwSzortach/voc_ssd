@@ -153,7 +153,8 @@ def get_matching_analysis_generator(ssd_model_configuration, ssd_input_generator
 
 class SSDTrainingLoopDataLoader:
     """
-    Data loader class that outputs (image, indices of default boxes that matched annotations in image),
+    Data loader class that outputs tuples
+    (image, indices of default boxes that matched annotations in image, categories ids boxes matched),
     or data suitable for training and evaluating SSD network
     """
 
@@ -171,6 +172,7 @@ class SSDTrainingLoopDataLoader:
         return len(self.voc_samples_data_loader)
 
     def __iter__(self):
+
         iterator = iter(self.voc_samples_data_loader)
 
         while True:
@@ -178,14 +180,25 @@ class SSDTrainingLoopDataLoader:
             image, annotations = next(iterator)
             default_boxes_matrix = self.default_boxes_factory.get_default_boxes_matrix(image.shape)
 
-            matched_default_boxes_indices_set = set()
+            all_matched_default_boxes_indices = []
+            all_matched_default_boxes_categories_ids = []
 
+            # For each annotation collect indices of default boxes that were matched,
+            # as well as matched categories indices
             for annotation in annotations:
 
                 matched_default_boxes_indices = net.utilities.get_matched_boxes_indices(
                     annotation.bounding_box, default_boxes_matrix)
 
-                matched_default_boxes_indices_set.update(matched_default_boxes_indices)
+                all_matched_default_boxes_indices.extend(matched_default_boxes_indices)
 
-            # sorted() both sorts data and casts set into list, which can be converted to numpy array
-            yield image, np.array(sorted(matched_default_boxes_indices_set)).astype(np.int32)
+                matched_default_boxes_categories_ids = [annotation.category_id] * len(matched_default_boxes_indices)
+                all_matched_default_boxes_categories_ids.extend(matched_default_boxes_categories_ids)
+
+            # Create a vector for all default boxes and set values to categories boxes were matched with
+            default_boxes_categories_ids_vector = np.zeros(shape=default_boxes_matrix.shape[0], dtype=np.int32)
+
+            default_boxes_categories_ids_vector[all_matched_default_boxes_indices] = \
+                all_matched_default_boxes_categories_ids
+
+            yield image, default_boxes_categories_ids_vector

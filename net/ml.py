@@ -6,8 +6,6 @@ import numpy as np
 import tensorflow as tf
 import tqdm
 
-import net.ssd
-
 
 class VGGishNetwork:
     """
@@ -57,7 +55,7 @@ class VGGishNetwork:
         predictions_heads_ops_list = \
             [self.prediction_heads[name] for name in model_configuration["prediction_heads_order"]]
 
-        self.predictions_logits_matrix_op = tf.concat(predictions_heads_ops_list, axis=1)
+        self.batch_of_predictions_logits_matrices_op = tf.concat(predictions_heads_ops_list, axis=1)
 
     @staticmethod
     def get_prediction_head(input_op, categories_count, head_configuration):
@@ -104,6 +102,13 @@ class VGGishModel:
         self.network = network
         self.learning_rate = None
 
+        self.default_boxes_categories_ids_vector_placeholder = tf.placeholder(dtype=tf.int32, shape=(None,))
+
+        self.loss_op = self._get_loss_op(
+            default_boxes_categories_ids_vector_placeholder=self.default_boxes_categories_ids_vector_placeholder,
+            batch_of_predictions_logits_matrices_op=self.network.batch_of_predictions_logits_matrices_op
+        )
+
     def train(self, data_bunch, configuration):
         """
         Method for training network
@@ -141,25 +146,47 @@ class VGGishModel:
 
     def _train_for_one_epoch(self, data_generator, samples_count):
 
-        # training_losses = []
-
-        default_boxes_factory = net.ssd.DefaultBoxesFactory(self.network.model_configuration)
+        training_losses = []
 
         # for _ in tqdm.tqdm(range(len(data_loade)):
         for _ in tqdm.tqdm(range(5)):
 
-            image, _matched_default_boxes_indices = next(data_generator)
+            image, default_boxes_categories_ids_vector = next(data_generator)
 
-            default_boxes_matrix = default_boxes_factory.get_default_boxes_matrix(image.shape)
+            print(default_boxes_categories_ids_vector.shape)
 
-            print("Image shape: {}".format(image.shape))
-            print("default_boxes_matrix shape: {}".format(default_boxes_matrix.shape))
+            feed_dictionary = {
+                self.network.input_placeholder: np.array([image]),
+                self.default_boxes_categories_ids_vector_placeholder: default_boxes_categories_ids_vector,
+            }
 
-            feed_dictionary = {self.network.input_placeholder: np.array([image])}
+            batch_of_predictions_logits_matrices, loss = self.session.run(
+                [self.network.batch_of_predictions_logits_matrices_op, self.loss_op], feed_dictionary)
 
-            predictions_logits_matrix = self.session.run(
-                self.network.predictions_logits_matrix_op, feed_dictionary)
-
-            print("predictions_logits_matrix shape: {}".format(predictions_logits_matrix.shape))
+            print("batch_of_predictions_logits_matrices shape: {}".format(batch_of_predictions_logits_matrices.shape))
+            print("loss shape: {}".format(loss.shape))
+            print(loss)
+            training_losses.append(loss)
 
         return "fake training loss"
+
+    @staticmethod
+    def _get_loss_op(
+            default_boxes_categories_ids_vector_placeholder,
+            batch_of_predictions_logits_matrices_op):
+
+        # First flatten out batch dimension for batch_of_predictions_logits_matrices_op
+        # Its batch dimension should be 1, we would tensorflow to raise an exception of it isn't
+
+        batch_of_predictions_logits_matrices_shape = tf.shape(batch_of_predictions_logits_matrices_op)
+        default_boxes_count = batch_of_predictions_logits_matrices_shape[1]
+        categories_count = batch_of_predictions_logits_matrices_shape[2]
+
+        predictions_logits_matrix = tf.reshape(
+            batch_of_predictions_logits_matrices_op,
+            shape=(default_boxes_count, categories_count))
+
+        raw_loss_op = tf.losses.sparse_softmax_cross_entropy(
+            labels=default_boxes_categories_ids_vector_placeholder, logits=predictions_logits_matrix)
+
+        return tf.reduce_mean(raw_loss_op)
