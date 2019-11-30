@@ -21,7 +21,10 @@ def log_voc_samples_generator_output(logger, config):
     """
 
     samples_loader = net.data.VOCSamplesDataLoader(
-        config["voc"]["data_directory"], config["voc"]["validation_set_path"], config["size_factor"])
+        data_directory=config["voc"]["data_directory"],
+        data_set_path=config["voc"]["validation_set_path"],
+        categories=config["categories"],
+        size_factor=config["size_factor"])
 
     generator = iter(samples_loader)
 
@@ -75,7 +78,10 @@ def log_samples_with_odd_sized_annotations(logger, config):
     """
 
     samples_loader = net.data.VOCSamplesDataLoader(
-        config["voc"]["data_directory"], config["voc"]["validation_set_path"], config["size_factor"])
+        data_directory=config["voc"]["data_directory"],
+        data_set_path=config["voc"]["validation_set_path"],
+        categories=config["categories"],
+        size_factor=config["size_factor"])
 
     generator = iter(samples_loader)
 
@@ -156,6 +162,7 @@ def log_default_boxes_matches(logger, config):
     samples_loader = net.data.VOCSamplesDataLoader(
         data_directory=config["voc"]["data_directory"],
         data_set_path=config["voc"]["validation_set_path"],
+        categories=config["categories"],
         size_factor=config["size_factor"],
         objects_filtering_config=config["objects_filtering"])
 

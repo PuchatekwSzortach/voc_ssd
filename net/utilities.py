@@ -15,10 +15,11 @@ class Annotation:
     A simple class for bundling bounding box and category of an object
     """
 
-    def __init__(self, bounding_box, label=None):
+    def __init__(self, bounding_box, label=None, category_id=None):
 
         self.bounding_box = tuple(bounding_box)
         self.label = label
+        self.category_id = category_id
 
     @property
     def width(self):

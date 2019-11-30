@@ -9,7 +9,6 @@ import threading
 import queue
 
 import xmltodict
-import tqdm
 import cv2
 
 import net.utilities
@@ -28,10 +27,11 @@ def get_dataset_filenames(data_directory, data_set_path):
         return [line.strip() for line in file.readlines()]
 
 
-def get_objects_annotations(image_annotations):
+def get_objects_annotations(image_annotations, labels_to_categories_index_map):
     """
     Given an image annotations object, return a list of objects annotations
     :param image_annotations: dictionary with image annotations
+    :param labels_to_categories_index_map: dictionary {str: int}, specifies numerical index for each category label
     :return: list of net.utility.Annotation objects
     """
 
@@ -52,83 +52,14 @@ def get_objects_annotations(image_annotations):
             int(raw_object_annotation["bndbox"]["xmin"]), int(raw_object_annotation["bndbox"]["ymin"]),
             int(raw_object_annotation["bndbox"]["xmax"]), int(raw_object_annotation["bndbox"]["ymax"])]
 
-        annotation = net.utilities.Annotation(bounding_box=bounding_box, label=raw_object_annotation["name"])
+        annotation = net.utilities.Annotation(
+            bounding_box=bounding_box,
+            label=raw_object_annotation["name"],
+            category_id=labels_to_categories_index_map[raw_object_annotation["name"]])
+
         annotations.append(annotation)
 
     return annotations
-
-
-def get_resized_objects_sizes(image_annotations, size_factor):
-    """
-    Given image annotations dictionary and size factor,
-    return list of object sizes that are resized as if the image they are contained in was resized to be
-    a multiple of size factor
-    :param image_annotations: dictionary with image annotations
-    :param size_factor: integer, factor a multiple of which image containing annotations would be resized to,
-    thus influencing how annotated objects will be resized as well
-    :return: list of (object height, object width) tuples
-    """
-
-    objects_annotations = net.data.get_objects_annotations(image_annotations)
-
-    image_size = \
-        int(image_annotations["annotation"]["size"]["height"]), \
-        int(image_annotations["annotation"]["size"]["width"])
-
-    target_shape = net.utilities.get_target_shape(image_size, size_factor)
-
-    y_resize_fraction = target_shape[0] / image_size[0]
-    x_resize_fraction = target_shape[1] / image_size[1]
-
-    objects_sizes = []
-
-    for object_annotation in objects_annotations:
-
-        x_min, y_min, x_max, y_max = object_annotation.bounding_box
-
-        resized_bounding_box = \
-            round(x_min * x_resize_fraction), round(y_min * y_resize_fraction), \
-            round(x_max * x_resize_fraction), round(y_max * y_resize_fraction)
-
-        object_size = \
-            resized_bounding_box[3] - resized_bounding_box[1], \
-            resized_bounding_box[2] - resized_bounding_box[0]
-
-        objects_sizes.append(object_size)
-
-    return objects_sizes
-
-
-def get_resized_dataset_objects_sizes(annotations_paths, size_factor, verbose=False):
-    """
-    Given annotations paths and size factor a multiple of which we want resized images to be,
-    return all objects sizes from all annotations. Objects are resized in line with hypothetical image resize
-    given by size_factor
-    :param annotations_paths: list of strings, paths to annotation files
-    :param size_factor: integer
-    :param verbose: bool, specifies whether progress bar should be displayed
-    :return: list of (height, width) tuples
-    """
-
-    objects_sizes = []
-
-    for annotations_path in tqdm.tqdm(annotations_paths, disable=not verbose):
-
-        with open(annotations_path) as file:
-            image_annotations = xmltodict.parse(file.read())
-
-            # Since we are resizing image to be a multiple of 32 before feeding them to the network,
-            # we need to do the same to objects inside the image
-            image_objects_sizes = net.data.get_resized_objects_sizes(image_annotations, size_factor)
-            objects_sizes.extend(image_objects_sizes)
-
-    return objects_sizes
-
-
-class DataLoader:
-    """
-    A generic loader class
-    """
 
 
 class DataBunch:
@@ -147,11 +78,13 @@ class VOCSamplesDataLoader:
     Data loader that yields (image, annotations) pairs
     """
 
-    def __init__(self, data_directory, data_set_path, size_factor, objects_filtering_config=None):
+    def __init__(self, data_directory, data_set_path, categories, size_factor, objects_filtering_config=None):
         """
         Constructor
         :param data_directory: path to VOC dataset directory
         :param data_set_path: path to file listing images to be used - for selecting between train and validation
+        :param categories: list of strings, indices correspond to ids we want to give to numerical representation
+        of each label
         :param size_factor: size factor to which images should be rescaled
         data sets
         :param objects_filtering_config: dictionary, defaults to None. If provided, data loader
@@ -160,6 +93,9 @@ class VOCSamplesDataLoader:
 
         self.data_directory = data_directory
         self.images_filenames = get_dataset_filenames(data_directory, data_set_path)
+
+        self.labels_to_categories_index_map = {label: index for (index, label) in enumerate(categories)}
+
         self.size_factor = size_factor
 
         self.objects_filtering_config = objects_filtering_config
@@ -187,7 +123,7 @@ class VOCSamplesDataLoader:
 
                     image_annotations = xmltodict.parse(file.read())
 
-                objects_annotations = get_objects_annotations(image_annotations)
+                objects_annotations = get_objects_annotations(image_annotations, self.labels_to_categories_index_map)
 
                 if self.objects_filtering_config is not None:
 

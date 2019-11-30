@@ -60,6 +60,8 @@ def get_filtered_dataset_annotations(config):
     annotations_paths = [os.path.join(config["voc"]["data_directory"], "Annotations", image_filename + ".xml")
                          for image_filename in images_filenames]
 
+    labels_to_categories_index_map = {label: index for (index, label) in enumerate(config["categories"])}
+
     all_annotations = []
 
     for annotations_path in tqdm.tqdm(annotations_paths):
@@ -73,7 +75,9 @@ def get_filtered_dataset_annotations(config):
                 int(image_annotations_xml["annotation"]["size"]["width"])
 
             # Read annotations
-            annotations = net.data.get_objects_annotations(image_annotations_xml)
+            annotations = net.data.get_objects_annotations(
+                image_annotations=image_annotations_xml,
+                labels_to_categories_index_map=labels_to_categories_index_map)
 
             # Resize annotations in line with how we would resize the image
             annotations = [annotation.resize(image_size, config["size_factor"]) for annotation in annotations]
@@ -100,8 +104,6 @@ def main():
 
     with open(arguments.config) as file:
         config = yaml.safe_load(file)
-
-    # analyze_images_sizes(config)
 
     annotations = get_filtered_dataset_annotations(config)
     net.utilities.analyze_annotations(annotations)

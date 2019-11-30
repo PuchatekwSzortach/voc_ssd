@@ -2,7 +2,9 @@
 Module with machine learning code
 """
 
+import numpy as np
 import tensorflow as tf
+import tqdm
 
 
 class VGGishNetwork:
@@ -10,11 +12,14 @@ class VGGishNetwork:
     SSD model based on VGG
     """
 
-    def __init__(self, categories_count):
+    def __init__(self, model_configuration, categories_count):
         """
         Constructor
+        :param model_configuration: dictionary with model configuration
         :param categories_count: number of categories to predict, including background
         """
+
+        self.model_configuration = model_configuration
 
         vgg = tf.keras.applications.VGG16(include_top=False)
 
@@ -28,23 +33,57 @@ class VGGishNetwork:
         }
 
         self.prediction_heads = {
-            "block2_head": self.get_prediction_head(self.ops_map["block2_pool"], categories_count),
-            "block3_head": self.get_prediction_head(self.ops_map["block3_pool"], categories_count),
-            "block4_head": self.get_prediction_head(self.ops_map["block4_pool"], categories_count),
-            "block5_head": self.get_prediction_head(self.ops_map["block5_pool"], categories_count)
+            "block2_head": self.get_prediction_head(
+                input_op=self.ops_map["block2_pool"],
+                categories_count=categories_count,
+                head_configuration=model_configuration["block2_head"]),
+            "block3_head": self.get_prediction_head(
+                input_op=self.ops_map["block3_pool"],
+                categories_count=categories_count,
+                head_configuration=model_configuration["block3_head"]),
+            "block4_head": self.get_prediction_head(
+                input_op=self.ops_map["block4_pool"],
+                categories_count=categories_count,
+                head_configuration=model_configuration["block4_head"]),
+            "block5_head": self.get_prediction_head(
+                input_op=self.ops_map["block5_pool"],
+                categories_count=categories_count,
+                head_configuration=model_configuration["block5_head"]),
         }
 
+        # Create prediction logits of assembling all prediction heads into a single matrix
+        predictions_heads_ops_list = \
+            [self.prediction_heads[name] for name in model_configuration["prediction_heads_order"]]
+
+        self.batch_of_predictions_logits_matrices_op = tf.concat(predictions_heads_ops_list, axis=1)
+
     @staticmethod
-    def get_prediction_head(input_op, filters_count):
+    def get_prediction_head(input_op, categories_count, head_configuration):
         """
         Creates a prediction head
         :param input_op: input tensor
-        :param filters_count: number of filters prediction head should have
+        :param categories_count: int, number of filters output of prediction head should have - basically
+        we want prediction head to predict a one-hot encoding for each default fox
+        :param head_configuration: dictionary with head configuration options
         :return: tensor op
         """
 
-        x = tf.keras.layers.Conv2D(filters=128, kernel_size=(3, 3), padding='valid', activation='elu')(input_op)
-        return tf.keras.layers.Conv2D(filters=filters_count, kernel_size=(3, 3), padding='valid')(x)
+        # Compute total number of default boxes prediction head should make prediction for.
+        # For each pixel prediction head receives it should make predictions for
+        # base bounding boxes sizes count * 2 * aspect ratios count default boxes centered on that pixel.
+        # We multiple aspect rations by 2, since we compute them both in horizontal and vertical orientation
+        default_boxes_count = \
+            len(head_configuration["base_bounding_box_sizes"]) * \
+            2 * len(head_configuration["aspect_ratios"])
+
+        # For each default box we want to make one hot encoded prediction across categories
+        total_filters_count = default_boxes_count * categories_count
+
+        x = tf.keras.layers.Conv2D(filters=128, kernel_size=(3, 3), padding='same', activation='elu')(input_op)
+        x = tf.keras.layers.Conv2D(filters=total_filters_count, kernel_size=(3, 3), padding='same')(x)
+
+        # Reshape prediction to 3D matrix (batch_dimension, default boxes on all pixel locations, categories count)
+        return tf.reshape(x, shape=(tf.shape(x)[0], -1, categories_count))
 
 
 class VGGishModel:
@@ -52,54 +91,102 @@ class VGGishModel:
     Class that wraps VGGish network to provide training and prediction methods
     """
 
-    def __init__(self, network):
+    def __init__(self, session, network):
         """
         Constructor
-        :param network:
+        :param session: tensorflow.Session instance
+        :param network: SSD model network instance
         """
 
+        self.session = session
         self.network = network
         self.learning_rate = None
 
-    def train(self, data_bunch, default_boxes_factory, configuration):
+        self.default_boxes_categories_ids_vector_placeholder = tf.placeholder(dtype=tf.int32, shape=(None,))
+
+        self.loss_op = self._get_loss_op(
+            default_boxes_categories_ids_vector_placeholder=self.default_boxes_categories_ids_vector_placeholder,
+            batch_of_predictions_logits_matrices_op=self.network.batch_of_predictions_logits_matrices_op
+        )
+
+    def train(self, data_bunch, configuration):
         """
         Method for training network
         :param data_bunch: net.data.DataBunch instance created with SSD input data loaders
-        :param default_boxes_factory: DefaultBoxesFactory instance, creates default boxes for data from generators
         :param configuration: dictionary with training options
         """
 
         self.learning_rate = configuration["learning_rate"]
         epoch_index = 0
 
-        # training_data_generator = iter(data_bunch.training_data_loader)
+        training_data_generator = iter(data_bunch.training_data_loader)
 
-        while epoch_index < configuration["epochs"]:
+        try:
 
-            print("Epoch {}/{}".format(epoch_index, configuration["epochs"]))
+            while epoch_index < configuration["epochs"]:
 
-            # epoch_log = {
-            #     "epoch_index": epoch_index,
-            #     "training_loss": self._train_for_one_epoch(
-            #         training_data_generator, len(data_bunch.training_data_loader))
-            # }
+                print("Epoch {}/{}".format(epoch_index, configuration["epochs"]))
 
-            epoch_log = "nothing in here yet"
+                epoch_log = {
+                    "epoch_index": epoch_index,
+                    "training_loss": self._train_for_one_epoch(
+                        data_generator=training_data_generator,
+                        samples_count=len(data_bunch.training_data_loader))
+                }
 
-            print(epoch_log)
-            epoch_index += 1
+                print(epoch_log)
 
-        # Needed once we actually start generators
-        # data_bunch.training_data_loader.stop_generator()
-        # validation_data_generator_factory.stop_generator()
+                epoch_index += 1
 
-    # def _train_for_one_epoch(self, data_generator, batches_count):
-    #
-    #     # training_losses = []
-    #
-    #     # for _ in tqdm.tqdm(range(batches_count)):
-    #     # for _ in tqdm.tqdm(range(500)):
-    #     #
-    #     #     image, annotations = next(data_generator)
-    #
-    #     return "fake training loss"
+        finally:
+
+            # Needed once we actually start generators
+            data_bunch.training_data_loader.stop_generator()
+            # validation_data_generator_factory.stop_generator()
+
+    def _train_for_one_epoch(self, data_generator, samples_count):
+
+        training_losses = []
+
+        # for _ in tqdm.tqdm(range(len(data_loade)):
+        for _ in tqdm.tqdm(range(5)):
+
+            image, default_boxes_categories_ids_vector = next(data_generator)
+
+            print(default_boxes_categories_ids_vector.shape)
+
+            feed_dictionary = {
+                self.network.input_placeholder: np.array([image]),
+                self.default_boxes_categories_ids_vector_placeholder: default_boxes_categories_ids_vector,
+            }
+
+            batch_of_predictions_logits_matrices, loss = self.session.run(
+                [self.network.batch_of_predictions_logits_matrices_op, self.loss_op], feed_dictionary)
+
+            print("batch_of_predictions_logits_matrices shape: {}".format(batch_of_predictions_logits_matrices.shape))
+            print("loss shape: {}".format(loss.shape))
+            print(loss)
+            training_losses.append(loss)
+
+        return "fake training loss"
+
+    @staticmethod
+    def _get_loss_op(
+            default_boxes_categories_ids_vector_placeholder,
+            batch_of_predictions_logits_matrices_op):
+
+        # First flatten out batch dimension for batch_of_predictions_logits_matrices_op
+        # Its batch dimension should be 1, we would tensorflow to raise an exception of it isn't
+
+        batch_of_predictions_logits_matrices_shape = tf.shape(batch_of_predictions_logits_matrices_op)
+        default_boxes_count = batch_of_predictions_logits_matrices_shape[1]
+        categories_count = batch_of_predictions_logits_matrices_shape[2]
+
+        predictions_logits_matrix = tf.reshape(
+            batch_of_predictions_logits_matrices_op,
+            shape=(default_boxes_count, categories_count))
+
+        raw_loss_op = tf.losses.sparse_softmax_cross_entropy(
+            labels=default_boxes_categories_ids_vector_placeholder, logits=predictions_logits_matrix)
+
+        return tf.reduce_mean(raw_loss_op)
