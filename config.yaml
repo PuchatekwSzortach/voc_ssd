@@ -61,5 +61,5 @@ vggish_model_configuration:
 
 
 train:
-  epochs: 2
+  epochs: 10
   learning_rate: 0.001

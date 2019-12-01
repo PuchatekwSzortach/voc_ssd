@@ -109,6 +109,9 @@ class VGGishModel:
             batch_of_predictions_logits_matrices_op=self.network.batch_of_predictions_logits_matrices_op
         )
 
+        self.learning_rate_placeholder = tf.placeholder(shape=None, dtype=tf.float32)
+        self.train_op = tf.train.AdamOptimizer(learning_rate=self.learning_rate_placeholder).minimize(self.loss_op)
+
     def train(self, data_bunch, configuration):
         """
         Method for training network
@@ -120,6 +123,7 @@ class VGGishModel:
         epoch_index = 0
 
         training_data_generator = iter(data_bunch.training_data_loader)
+        validation_data_generator = iter(data_bunch.validation_data_loader)
 
         try:
 
@@ -131,43 +135,61 @@ class VGGishModel:
                     "epoch_index": epoch_index,
                     "training_loss": self._train_for_one_epoch(
                         data_generator=training_data_generator,
-                        samples_count=len(data_bunch.training_data_loader))
+                        samples_count=len(data_bunch.training_data_loader)),
+                    "validation_loss": self._validate_for_one_epoch(
+                        data_generator=validation_data_generator,
+                        samples_count=len(data_bunch.validation_data_loader)
+                    )
                 }
 
                 print(epoch_log)
-
                 epoch_index += 1
 
         finally:
 
             # Needed once we actually start generators
             data_bunch.training_data_loader.stop_generator()
-            # validation_data_generator_factory.stop_generator()
+            data_bunch.validation_data_loader.stop_generator()
 
     def _train_for_one_epoch(self, data_generator, samples_count):
 
-        training_losses = []
+        losses = []
 
-        # for _ in tqdm.tqdm(range(len(data_generator)):
-        for _ in tqdm.tqdm(range(5)):
+        for _ in tqdm.tqdm(range(samples_count)):
 
             image, default_boxes_categories_ids_vector = next(data_generator)
 
             feed_dictionary = {
                 self.network.input_placeholder: np.array([image]),
                 self.default_boxes_categories_ids_vector_placeholder: default_boxes_categories_ids_vector,
+                self.learning_rate_placeholder: 0.00001
             }
 
-            batch_of_predictions_logits_matrices, loss = self.session.run(
-                [self.network.batch_of_predictions_logits_matrices_op, self.loss_op], feed_dictionary)
+            loss, _ = self.session.run(
+                [self.loss_op, self.train_op], feed_dictionary)
 
-            print("\n\n")
-            print("batch_of_predictions_logits_matrices shape: {}".format(batch_of_predictions_logits_matrices.shape))
-            print("loss: {}".format(loss))
+            losses.append(loss)
 
-            training_losses.append(loss)
+        return np.mean(losses)
 
-        return "fake training loss"
+    def _validate_for_one_epoch(self, data_generator, samples_count):
+
+        losses = []
+
+        for _ in tqdm.tqdm(range(samples_count)):
+
+            image, default_boxes_categories_ids_vector = next(data_generator)
+
+            feed_dictionary = {
+                self.network.input_placeholder: np.array([image]),
+                self.default_boxes_categories_ids_vector_placeholder: default_boxes_categories_ids_vector
+            }
+
+            loss = self.session.run(self.loss_op, feed_dictionary)
+
+            losses.append(loss)
+
+        return np.mean(losses)
 
     @staticmethod
     def _get_loss_op(
