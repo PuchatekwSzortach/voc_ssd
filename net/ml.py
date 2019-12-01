@@ -59,6 +59,9 @@ class VGGishNetwork:
 
         self.batch_of_predictions_logits_matrices_op = tf.concat(predictions_heads_ops_list, axis=1)
 
+        self.batch_of_softmax_predictions_matrices_op = tf.nn.softmax(
+            self.batch_of_predictions_logits_matrices_op, axis=-1)
+
     @staticmethod
     def get_prediction_head(input_op, categories_count, head_configuration):
         """
@@ -150,8 +153,7 @@ class VGGishModel:
                         samples_count=len(data_bunch.training_data_loader)),
                     "validation_loss": self._validate_for_one_epoch(
                         data_generator=validation_data_generator,
-                        samples_count=len(data_bunch.validation_data_loader)
-                    )
+                        samples_count=len(data_bunch.validation_data_loader))
                 }
 
                 print(epoch_log)
@@ -223,17 +225,17 @@ class VGGishModel:
             batch_of_predictions_logits_matrices_op,
             shape=(default_boxes_count, categories_count))
 
-        raw_loss_op = tf.losses.sparse_softmax_cross_entropy(
+        raw_loss_op = tf.nn.sparse_softmax_cross_entropy_with_logits(
             labels=default_boxes_categories_ids_vector_placeholder, logits=predictions_logits_matrix)
 
         all_ones_op = tf.ones(shape=(default_boxes_count,), dtype=tf.float32)
         all_zeros_op = tf.zeros(shape=(default_boxes_count,), dtype=tf.float32)
 
-        # Get a selector for all positive losses, split positive losses and negatives losses
+        # Get a selector that's set to 1 where for all positive losses, split positive losses and negatives losses
         positive_losses_selector_op = tf.where(
             default_boxes_categories_ids_vector_placeholder > 0, all_ones_op, all_zeros_op)
 
-        positive_matches_count = tf.cast(tf.reduce_sum(positive_losses_selector_op), tf.int32)
+        positive_matches_count_op = tf.cast(tf.reduce_sum(positive_losses_selector_op), tf.int32)
 
         # Get positive losses op - that is op with losses only for default bounding boxes
         # that were matched with ground truth annotations.
@@ -241,18 +243,18 @@ class VGGishModel:
         # Then sort losses in descending order and select positive_matches_count elements.
         # Thus end effect is that we select positive losses only
         positive_losses_op = tf.sort(
-            raw_loss_op * positive_losses_selector_op, direction='DESCENDING')[:positive_matches_count]
+            raw_loss_op * positive_losses_selector_op, direction='DESCENDING')[:positive_matches_count_op]
 
         # Get negative losses op that is op with losses for default boxes that weren't matched with any ground truth
         # annotations, or should predict background, in a similar manner as we did for positive losses.
         # Choose x times positive matches count largest losses only for hard negatives mining
         negative_losses_op = tf.sort(
-            raw_loss_op * (1.0 - positive_losses_selector_op), direction='DESCENDING')[:(1000 * positive_matches_count)]
+            raw_loss_op * (1.0 - positive_losses_selector_op), direction='DESCENDING')[:(3 * positive_matches_count_op)]
 
         # If there were any positive matches at all, then return mean of both losses.
         # Otherwise return 0 - as we can't have a mean of an empty op.
         return tf.cond(
-            pred=positive_matches_count > 0,
+            pred=positive_matches_count_op > 0,
             true_fn=lambda: tf.reduce_mean(tf.concat([positive_losses_op, negative_losses_op], axis=0)),
             false_fn=lambda: tf.constant(0, dtype=tf.float32))
 

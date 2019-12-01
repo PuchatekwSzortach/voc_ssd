@@ -202,3 +202,34 @@ class SSDTrainingLoopDataLoader:
                 all_matched_default_boxes_categories_ids
 
             yield image, default_boxes_categories_ids_vector
+
+
+def get_predicted_annotations(default_boxes_matrix, softmax_predictions_matrix, categories, threshold):
+    """
+    Get list of predicted annotations based on default boxes matrix and softmax predictions matrix, using
+    predictions above given threshold
+    :param default_boxes_matrix: 2D numpy array, each row represents coordinates of a default bounding box
+    :param softmax_predictions_matrix: 2D numpy array, each row represents one-hot encoded softmax predictions
+    for a corresponding default box
+    :param categories: list of strings
+    :param threshold: float, only non-background predictions above threshold will be returned
+    :return: list of net.data.Annotation instances
+    """
+
+    print("softmax_predictions_matrix shape: {}".format(softmax_predictions_matrix.shape))
+
+    # Get a selector for non-background predictions over threshold
+    # predictions_selector = \
+    #     (np.argmax(softmax_predictions_matrix, axis=1) > 0) & \
+    #     (np.max(softmax_predictions_matrix, axis=1) > threshold)
+
+    predictions_selector = np.argmax(softmax_predictions_matrix, axis=1) > 0
+
+    print("Predictions selector sum: {}".format(np.sum(predictions_selector)))
+
+    selected_predictions_confidences = np.max(softmax_predictions_matrix[predictions_selector], axis=1)
+    # print(selected_predictions_confidences)
+    # print(selected_predictions_confidences.shape)
+
+    return []
+

@@ -5,14 +5,17 @@ Script with visualizations of data generators outputs, model prediction, etc
 import argparse
 import sys
 
-import yaml
+import numpy as np
+import tensorflow as tf
 import tqdm
 import vlogging
+import yaml
 
 import net.utilities
 import net.data
-import net.ssd
+import net.ml
 import net.plot
+import net.ssd
 
 
 def log_voc_samples_generator_output(logger, config):
@@ -175,6 +178,60 @@ def log_default_boxes_matches(logger, config):
             logger, iter(samples_loader), default_boxes_factory, categories_to_colors_map, config["font_path"])
 
 
+def log_predictions(logger, config):
+
+    network = net.ml.VGGishNetwork(
+        model_configuration=config["vggish_model_configuration"],
+        categories_count=len(config["categories"]))
+
+    session = tf.keras.backend.get_session()
+
+    model = net.ml.VGGishModel(session, network)
+    model.load(config["best_model_checkpoint_path"])
+
+    validation_samples_loader = net.data.VOCSamplesDataLoader(
+        data_directory=config["voc"]["data_directory"],
+        data_set_path=config["voc"]["validation_set_path"],
+        categories=config["categories"],
+        size_factor=config["size_factor"],
+        objects_filtering_config=config["objects_filtering"])
+
+    default_boxes_factory = net.ssd.DefaultBoxesFactory(model_configuration=config["vggish_model_configuration"])
+    iterator = iter(validation_samples_loader)
+
+    for _ in tqdm.tqdm(range(10)):
+
+        image, ground_truth_annotations = next(iterator)
+
+        ground_truth_annotations_image = net.plot.get_annotated_image(
+            image=image,
+            annotations=ground_truth_annotations,
+            colors=[(255, 0, 0)] * len(ground_truth_annotations),
+            font_path=config["font_path"])
+
+        softmax_predictions_matrix = session.run(
+            network.batch_of_softmax_predictions_matrices_op,
+            feed_dict={network.input_placeholder: np.array([image])})[0]
+
+        default_boxes_matrix = default_boxes_factory.get_default_boxes_matrix(image.shape)
+
+        # Get annotations boxes and labels from predictions matrix and default boxes matrix
+        predicted_annotations = net.ssd.get_predicted_annotations(
+            default_boxes_matrix=default_boxes_matrix,
+            softmax_predictions_matrix=softmax_predictions_matrix,
+            categories=config["categories"],
+            threshold=0.5)
+
+        predicted_annotations_image = net.plot.get_annotated_image(
+            image=image,
+            annotations=predicted_annotations,
+            colors=[(0, 255, 0)] * len(ground_truth_annotations),
+            font_path=config["font_path"])
+
+        logger.info(vlogging.VisualRecord(
+            "Ground truth vs predictions", [ground_truth_annotations_image, predicted_annotations_image]))
+
+
 def main():
     """
     Script entry point
@@ -193,7 +250,8 @@ def main():
     # log_voc_samples_generator_output(logger, config)
     # log_samples_with_odd_sized_annotations(logger, config)
 
-    log_default_boxes_matches(logger, config)
+    # log_default_boxes_matches(logger, config)
+    log_predictions(logger, config)
 
 
 if __name__ == "__main__":
