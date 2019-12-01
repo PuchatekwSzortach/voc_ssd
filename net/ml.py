@@ -2,6 +2,8 @@
 Module with machine learning code
 """
 
+import os
+
 import numpy as np
 import tensorflow as tf
 import tqdm
@@ -112,11 +114,12 @@ class VGGishModel:
         self.learning_rate_placeholder = tf.placeholder(shape=None, dtype=tf.float32)
         self.train_op = tf.train.AdamOptimizer(learning_rate=self.learning_rate_placeholder).minimize(self.loss_op)
 
-    def train(self, data_bunch, configuration):
+    def train(self, data_bunch, configuration, callbacks):
         """
         Method for training network
         :param data_bunch: net.data.DataBunch instance created with SSD input data loaders
         :param configuration: dictionary with training options
+        :param callbacks: list of net.Callback instances. Used to save weights, control learning rate, etc.
         """
 
         self.learning_rate = configuration["learning_rate"]
@@ -124,6 +127,9 @@ class VGGishModel:
 
         training_data_generator = iter(data_bunch.training_data_loader)
         validation_data_generator = iter(data_bunch.validation_data_loader)
+
+        for callback in callbacks:
+            callback.model = self
 
         try:
 
@@ -143,11 +149,15 @@ class VGGishModel:
                 }
 
                 print(epoch_log)
+
+                for callback in callbacks:
+                    callback.on_epoch_end(epoch_log)
+
                 epoch_index += 1
 
         finally:
 
-            # Needed once we actually start generators
+            # Stop data generators, since they are running on a separate thread
             data_bunch.training_data_loader.stop_generator()
             data_bunch.validation_data_loader.stop_generator()
 
@@ -162,7 +172,7 @@ class VGGishModel:
             feed_dictionary = {
                 self.network.input_placeholder: np.array([image]),
                 self.default_boxes_categories_ids_vector_placeholder: default_boxes_categories_ids_vector,
-                self.learning_rate_placeholder: 0.00001
+                self.learning_rate_placeholder: self.learning_rate
             }
 
             loss, _ = self.session.run(
@@ -239,3 +249,20 @@ class VGGishModel:
             pred=positive_matches_count > 0,
             true_fn=lambda: tf.reduce_mean(tf.concat([positive_losses_op, negative_losses_op], axis=0)),
             false_fn=lambda: tf.constant(0, dtype=tf.float32))
+
+    def save(self, save_path):
+        """
+        Save model's network
+        :param save_path: prefix for filenames created for the checkpoint
+        """
+
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        tf.train.Saver().save(self.session, save_path)
+
+    def load(self, save_path):
+        """
+        Save model's network
+        :param save_path: prefix for filenames created for the checkpoint
+        """
+
+        tf.train.Saver().restore(self.session, save_path)
