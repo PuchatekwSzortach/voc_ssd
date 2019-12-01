@@ -102,17 +102,22 @@ class VGGishModel:
 
         self.session = session
         self.network = network
+        self.should_continue_training = None
         self.learning_rate = None
 
-        self.default_boxes_categories_ids_vector_placeholder = tf.placeholder(dtype=tf.int32, shape=(None,))
+        self.ops_map = {
+            "default_boxes_categories_ids_vector_placeholder": tf.placeholder(dtype=tf.int32, shape=(None,)),
+            "learning_rate_placeholder": tf.placeholder(shape=None, dtype=tf.float32),
+        }
 
-        self.loss_op = self._get_loss_op(
-            default_boxes_categories_ids_vector_placeholder=self.default_boxes_categories_ids_vector_placeholder,
+        self.ops_map["loss_op"] = self._get_loss_op(
+            default_boxes_categories_ids_vector_placeholder=self.ops_map[
+                "default_boxes_categories_ids_vector_placeholder"],
             batch_of_predictions_logits_matrices_op=self.network.batch_of_predictions_logits_matrices_op
         )
 
-        self.learning_rate_placeholder = tf.placeholder(shape=None, dtype=tf.float32)
-        self.train_op = tf.train.AdamOptimizer(learning_rate=self.learning_rate_placeholder).minimize(self.loss_op)
+        self.ops_map["train_op"] = tf.train.AdamOptimizer(
+            learning_rate=self.ops_map["learning_rate_placeholder"]).minimize(self.ops_map["loss_op"])
 
     def train(self, data_bunch, configuration, callbacks):
         """
@@ -123,6 +128,7 @@ class VGGishModel:
         """
 
         self.learning_rate = configuration["learning_rate"]
+        self.should_continue_training = True
         epoch_index = 0
 
         training_data_generator = iter(data_bunch.training_data_loader)
@@ -133,7 +139,7 @@ class VGGishModel:
 
         try:
 
-            while epoch_index < configuration["epochs"]:
+            while epoch_index < configuration["epochs"] and self.should_continue_training is True:
 
                 print("Epoch {}/{}".format(epoch_index, configuration["epochs"]))
 
@@ -171,12 +177,12 @@ class VGGishModel:
 
             feed_dictionary = {
                 self.network.input_placeholder: np.array([image]),
-                self.default_boxes_categories_ids_vector_placeholder: default_boxes_categories_ids_vector,
-                self.learning_rate_placeholder: self.learning_rate
+                self.ops_map["default_boxes_categories_ids_vector_placeholder"]: default_boxes_categories_ids_vector,
+                self.ops_map["learning_rate_placeholder"]: self.learning_rate
             }
 
             loss, _ = self.session.run(
-                [self.loss_op, self.train_op], feed_dictionary)
+                [self.ops_map["loss_op"], self.ops_map["train_op"]], feed_dictionary)
 
             losses.append(loss)
 
@@ -192,10 +198,10 @@ class VGGishModel:
 
             feed_dictionary = {
                 self.network.input_placeholder: np.array([image]),
-                self.default_boxes_categories_ids_vector_placeholder: default_boxes_categories_ids_vector
+                self.ops_map["default_boxes_categories_ids_vector_placeholder"]: default_boxes_categories_ids_vector
             }
 
-            loss = self.session.run(self.loss_op, feed_dictionary)
+            loss = self.session.run(self.ops_map["loss_op"], feed_dictionary)
 
             losses.append(loss)
 
