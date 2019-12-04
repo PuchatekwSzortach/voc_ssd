@@ -2,9 +2,13 @@
 Module with machine learning code
 """
 
+import os
+
 import numpy as np
 import tensorflow as tf
 import tqdm
+
+import net.ssd
 
 
 class VGGishNetwork:
@@ -57,6 +61,9 @@ class VGGishNetwork:
 
         self.batch_of_predictions_logits_matrices_op = tf.concat(predictions_heads_ops_list, axis=1)
 
+        self.batch_of_softmax_predictions_matrices_op = tf.nn.softmax(
+            self.batch_of_predictions_logits_matrices_op, axis=-1)
+
     @staticmethod
     def get_prediction_head(input_op, categories_count, head_configuration):
         """
@@ -100,30 +107,44 @@ class VGGishModel:
 
         self.session = session
         self.network = network
+        self.should_continue_training = None
         self.learning_rate = None
 
-        self.default_boxes_categories_ids_vector_placeholder = tf.placeholder(dtype=tf.int32, shape=(None,))
+        self.ops_map = {
+            "default_boxes_categories_ids_vector_placeholder": tf.placeholder(dtype=tf.int32, shape=(None,)),
+            "learning_rate_placeholder": tf.placeholder(shape=None, dtype=tf.float32),
+        }
 
-        self.loss_op = self._get_loss_op(
-            default_boxes_categories_ids_vector_placeholder=self.default_boxes_categories_ids_vector_placeholder,
+        self.ops_map["loss_op"] = self._get_loss_op(
+            default_boxes_categories_ids_vector_placeholder=self.ops_map[
+                "default_boxes_categories_ids_vector_placeholder"],
             batch_of_predictions_logits_matrices_op=self.network.batch_of_predictions_logits_matrices_op
         )
 
-    def train(self, data_bunch, configuration):
+        self.ops_map["train_op"] = tf.train.AdamOptimizer(
+            learning_rate=self.ops_map["learning_rate_placeholder"]).minimize(self.ops_map["loss_op"])
+
+    def train(self, data_bunch, configuration, callbacks):
         """
         Method for training network
         :param data_bunch: net.data.DataBunch instance created with SSD input data loaders
         :param configuration: dictionary with training options
+        :param callbacks: list of net.Callback instances. Used to save weights, control learning rate, etc.
         """
 
         self.learning_rate = configuration["learning_rate"]
+        self.should_continue_training = True
         epoch_index = 0
 
         training_data_generator = iter(data_bunch.training_data_loader)
+        validation_data_generator = iter(data_bunch.validation_data_loader)
+
+        for callback in callbacks:
+            callback.model = self
 
         try:
 
-            while epoch_index < configuration["epochs"]:
+            while epoch_index < configuration["epochs"] and self.should_continue_training is True:
 
                 print("Epoch {}/{}".format(epoch_index, configuration["epochs"]))
 
@@ -131,44 +152,64 @@ class VGGishModel:
                     "epoch_index": epoch_index,
                     "training_loss": self._train_for_one_epoch(
                         data_generator=training_data_generator,
-                        samples_count=len(data_bunch.training_data_loader))
+                        samples_count=len(data_bunch.training_data_loader)),
+                    "validation_loss": self._validate_for_one_epoch(
+                        data_generator=validation_data_generator,
+                        samples_count=len(data_bunch.validation_data_loader))
                 }
 
                 print(epoch_log)
+
+                for callback in callbacks:
+                    callback.on_epoch_end(epoch_log)
 
                 epoch_index += 1
 
         finally:
 
-            # Needed once we actually start generators
+            # Stop data generators, since they are running on a separate thread
             data_bunch.training_data_loader.stop_generator()
-            # validation_data_generator_factory.stop_generator()
+            data_bunch.validation_data_loader.stop_generator()
 
     def _train_for_one_epoch(self, data_generator, samples_count):
 
-        training_losses = []
+        losses = []
 
-        # for _ in tqdm.tqdm(range(len(data_loade)):
-        for _ in tqdm.tqdm(range(5)):
+        for _ in tqdm.tqdm(range(samples_count)):
 
             image, default_boxes_categories_ids_vector = next(data_generator)
 
-            print(default_boxes_categories_ids_vector.shape)
+            feed_dictionary = {
+                self.network.input_placeholder: np.array([image]),
+                self.ops_map["default_boxes_categories_ids_vector_placeholder"]: default_boxes_categories_ids_vector,
+                self.ops_map["learning_rate_placeholder"]: self.learning_rate
+            }
+
+            loss, _ = self.session.run(
+                [self.ops_map["loss_op"], self.ops_map["train_op"]], feed_dictionary)
+
+            losses.append(loss)
+
+        return np.mean(losses)
+
+    def _validate_for_one_epoch(self, data_generator, samples_count):
+
+        losses = []
+
+        for _ in tqdm.tqdm(range(samples_count)):
+
+            image, default_boxes_categories_ids_vector = next(data_generator)
 
             feed_dictionary = {
                 self.network.input_placeholder: np.array([image]),
-                self.default_boxes_categories_ids_vector_placeholder: default_boxes_categories_ids_vector,
+                self.ops_map["default_boxes_categories_ids_vector_placeholder"]: default_boxes_categories_ids_vector
             }
 
-            batch_of_predictions_logits_matrices, loss = self.session.run(
-                [self.network.batch_of_predictions_logits_matrices_op, self.loss_op], feed_dictionary)
+            loss = self.session.run(self.ops_map["loss_op"], feed_dictionary)
 
-            print("batch_of_predictions_logits_matrices shape: {}".format(batch_of_predictions_logits_matrices.shape))
-            print("loss shape: {}".format(loss.shape))
-            print(loss)
-            training_losses.append(loss)
+            losses.append(loss)
 
-        return "fake training loss"
+        return np.mean(losses)
 
     @staticmethod
     def _get_loss_op(
@@ -186,7 +227,24 @@ class VGGishModel:
             batch_of_predictions_logits_matrices_op,
             shape=(default_boxes_count, categories_count))
 
-        raw_loss_op = tf.losses.sparse_softmax_cross_entropy(
-            labels=default_boxes_categories_ids_vector_placeholder, logits=predictions_logits_matrix)
+        return net.ssd.get_single_shot_detector_loss_op(
+            default_boxes_categories_ids_vector_op=default_boxes_categories_ids_vector_placeholder,
+            predictions_logits_matrix_op=predictions_logits_matrix,
+            hard_negatives_mining_ratio=3)
 
-        return tf.reduce_mean(raw_loss_op)
+    def save(self, save_path):
+        """
+        Save model's network
+        :param save_path: prefix for filenames created for the checkpoint
+        """
+
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        tf.train.Saver().save(self.session, save_path)
+
+    def load(self, save_path):
+        """
+        Save model's network
+        :param save_path: prefix for filenames created for the checkpoint
+        """
+
+        tf.train.Saver().restore(self.session, save_path)

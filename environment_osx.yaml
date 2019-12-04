@@ -44,7 +44,6 @@ dependencies:
   - pixman=0.34.0=h470a237_3
   - python=3.6.6=hc167b69_0
   - readline=7.0=h1de35cc_5
-  - setuptools=40.2.0=py36_0
   - sqlite=3.24.0=ha441bb4_0
   - tk=8.6.8=ha441bb4_0
   - wheel=0.31.1=py36_0
@@ -52,7 +51,7 @@ dependencies:
   - xz=5.2.4=h1de35cc_4
   - zlib=1.2.11=hf3cbc9b_2
   - pip:
-    - absl-py==0.4.1
+    - absl-py==0.8.1
     - appnope==0.1.0
     - astor==0.7.1
     - astroid==2.0.4
@@ -65,6 +64,7 @@ dependencies:
     - flake8==3.5.0
     - flake8-polyfill==1.0.2
     - gast==0.2.0
+    - google-pasta==0.1.8
     - grpcio==1.14.2
     - h5py==2.8.0
     - idna==2.7
@@ -73,6 +73,8 @@ dependencies:
     - ipython-genutils==0.2.0
     - isort==4.3.4
     - jedi==0.12.1
+    - keras-applications==1.0.8
+    - keras-preprocessing==1.1.0
     - lazy-object-proxy==1.3.1
     - mando==0.6.4
     - markdown==2.6.11
@@ -95,11 +97,13 @@ dependencies:
     - pyyaml==3.13
     - radon==2.2.0
     - requests==2.19.1
+    - setuptools==42.0.1
     - simplegeneric==0.8.1
     - six==1.11.0
     - snakeviz==1.0.0
-    - tensorboard==1.10.0
-    - tensorflow==1.10.1
+    - tensorboard==1.14.0
+    - tensorflow==1.14.0
+    - tensorflow-estimator==1.14.0
     - termcolor==1.1.0
     - tornado==5.1.1
     - tqdm==4.25.0
@@ -109,7 +113,7 @@ dependencies:
     - visual-logging==1.0
     - wcwidth==0.1.7
     - werkzeug==0.14.1
-    - wrapt==1.10.11
+    - wrapt==1.11.2
     - xenon==0.5.4
     - xmltodict==0.11.0
 prefix: /Users/Kuba/anaconda3/envs/voc_ssd_environment

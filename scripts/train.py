@@ -8,9 +8,10 @@ import sys
 import tensorflow as tf
 import yaml
 
+import net.callbacks
 import net.data
-import net.ssd
 import net.ml
+import net.ssd
 
 
 def get_ssd_training_loop_data_bunch(config):
@@ -78,7 +79,20 @@ def main():
     uninitialized_variables = set(tf.global_variables()).difference(initialized_variables)
     session.run(tf.variables_initializer(uninitialized_variables))
 
-    model.train(data_bunch, config["train"])
+    callbacks = [
+        net.callbacks.ModelCheckpoint(
+            save_path=config["model_checkpoint_path"],
+            skip_epochs_count=0),
+        net.callbacks.EarlyStopping(config["train"]["early_stopping_patience"]),
+        net.callbacks.ReduceLearningRateOnPlateau(
+            config["train"]["reduce_learning_rate_patience"],
+            config["train"]["reduce_learning_rate_factor"])
+    ]
+
+    model.train(
+        data_bunch=data_bunch,
+        configuration=config["train"],
+        callbacks=callbacks)
 
 
 if __name__ == "__main__":

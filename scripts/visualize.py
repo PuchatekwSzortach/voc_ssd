@@ -5,14 +5,17 @@ Script with visualizations of data generators outputs, model prediction, etc
 import argparse
 import sys
 
-import yaml
+import numpy as np
+import tensorflow as tf
 import tqdm
 import vlogging
+import yaml
 
 import net.utilities
 import net.data
-import net.ssd
+import net.ml
 import net.plot
+import net.ssd
 
 
 def log_voc_samples_generator_output(logger, config):
@@ -175,6 +178,118 @@ def log_default_boxes_matches(logger, config):
             logger, iter(samples_loader), default_boxes_factory, categories_to_colors_map, config["font_path"])
 
 
+def log_ssd_training_loop_data_loader_outputs(logger, config):
+    """
+    Logger function for visually confirming that net.ssd.SSDTrainingLoopDataLoader outputs correct results
+    """
+
+    samples_loader = net.data.VOCSamplesDataLoader(
+        data_directory=config["voc"]["data_directory"],
+        data_set_path=config["voc"]["validation_set_path"],
+        categories=config["categories"],
+        size_factor=config["size_factor"],
+        objects_filtering_config=config["objects_filtering"])
+
+    ssd_validation_samples_loader = net.ssd.SSDTrainingLoopDataLoader(
+        voc_samples_data_loader=samples_loader,
+        ssd_model_configuration=config["vggish_model_configuration"])
+
+    default_boxes_factory = net.ssd.DefaultBoxesFactory(config["vggish_model_configuration"])
+
+    iterator = iter(ssd_validation_samples_loader)
+
+    for _ in range(20):
+
+        image, default_boxes_categories_ids_vector = next(iterator)
+
+        default_boxes_matrix = default_boxes_factory.get_default_boxes_matrix(image.shape)
+
+        matched_boxes = default_boxes_matrix[default_boxes_categories_ids_vector > 0]
+        matched_boxes_image = net.plot.get_image_with_boxes(image, matched_boxes, color=(0, 255, 0))
+
+        logger.info(vlogging.VisualRecord(
+            "image and default boxes matches", [image, matched_boxes_image]))
+
+
+def log_single_prediction(logger, network, session, default_boxes_factory, samples_iterator, config):
+    """
+    Log network prediction on a single sample. Draws a single sample from samples_iterator
+    :param logger: logger instance
+    :param network: net.ml.VGGishNetwork instance
+    :param session: tensorflow session
+    :param default_boxes_factory: net.ssd.DefaultBoxesFactory instance
+    :param samples_iterator: iterator that yields (image, ground truth annotations) tuples
+    :param config: dictionary with configuration options
+    """
+
+    image, ground_truth_annotations = next(samples_iterator)
+
+    ground_truth_annotations_image = net.plot.get_annotated_image(
+        image=image,
+        annotations=ground_truth_annotations,
+        colors=[(255, 0, 0)] * len(ground_truth_annotations),
+        font_path=config["font_path"])
+
+    softmax_predictions_matrix = session.run(
+        network.batch_of_softmax_predictions_matrices_op,
+        feed_dict={network.input_placeholder: np.array([image])})[0]
+
+    default_boxes_matrix = default_boxes_factory.get_default_boxes_matrix(image.shape)
+
+    # Get annotations boxes and labels from predictions matrix and default boxes matrix
+    predicted_annotations = net.ssd.get_predicted_annotations(
+        default_boxes_matrix=default_boxes_matrix,
+        softmax_predictions_matrix=softmax_predictions_matrix,
+        categories=config["categories"],
+        threshold=0.5)
+
+    predicted_annotations_image = net.plot.get_annotated_image(
+        image=image,
+        annotations=predicted_annotations,
+        colors=[(0, 255, 0)] * len(ground_truth_annotations),
+        font_path=config["font_path"])
+
+    logger.info(vlogging.VisualRecord(
+        "Ground truth vs predictions", [ground_truth_annotations_image, predicted_annotations_image]))
+
+
+def log_predictions(logger, config):
+    """
+    Log network predictions
+    :param logger: logger instance
+    :param config: dictionary with configuration options
+    """
+
+    network = net.ml.VGGishNetwork(
+        model_configuration=config["vggish_model_configuration"],
+        categories_count=len(config["categories"]))
+
+    session = tf.keras.backend.get_session()
+
+    model = net.ml.VGGishModel(session, network)
+    model.load(config["best_model_checkpoint_path"])
+
+    validation_samples_loader = net.data.VOCSamplesDataLoader(
+        data_directory=config["voc"]["data_directory"],
+        data_set_path=config["voc"]["validation_set_path"],
+        categories=config["categories"],
+        size_factor=config["size_factor"],
+        objects_filtering_config=config["objects_filtering"])
+
+    default_boxes_factory = net.ssd.DefaultBoxesFactory(model_configuration=config["vggish_model_configuration"])
+    iterator = iter(validation_samples_loader)
+
+    for _ in tqdm.tqdm(range(40)):
+
+        log_single_prediction(
+            logger=logger,
+            network=network,
+            session=session,
+            default_boxes_factory=default_boxes_factory,
+            samples_iterator=iterator,
+            config=config)
+
+
 def main():
     """
     Script entry point
@@ -193,7 +308,10 @@ def main():
     # log_voc_samples_generator_output(logger, config)
     # log_samples_with_odd_sized_annotations(logger, config)
 
-    log_default_boxes_matches(logger, config)
+    # log_default_boxes_matches(logger, config)
+
+    # log_ssd_training_loop_data_loader_outputs(logger, config)
+    log_predictions(logger, config)
 
 
 if __name__ == "__main__":
