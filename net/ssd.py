@@ -213,7 +213,7 @@ def get_predicted_annotations(default_boxes_matrix, softmax_predictions_matrix, 
     :param softmax_predictions_matrix: 2D numpy array, each row represents one-hot encoded softmax predictions
     for a corresponding default box
     :param categories: list of strings
-    :param threshold: float, only non-background predictions above threshold will be returned
+    :param threshold: float, only non-background predictions above this threshold will be returned
     :return: list of net.data.Annotation instances
     """
 
