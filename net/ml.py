@@ -248,3 +248,16 @@ class VGGishModel:
         """
 
         tf.train.Saver().restore(self.session, save_path)
+
+    def predict(self, image):
+        """
+        Computes prediction on a single image
+        :param image: numpy array
+        :return: 2D numpy array, softmax_predictions_matrix
+        """
+
+        feed_dictionary = {
+            self.network.input_placeholder: np.array([image])
+        }
+
+        return self.session.run(self.network.batch_of_softmax_predictions_matrices_op, feed_dictionary)[0]

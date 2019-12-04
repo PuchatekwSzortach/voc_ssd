@@ -329,7 +329,7 @@ def get_annotations_from_default_boxes(default_boxes_matrix):
 def get_matched_boxes_indices(template_box, boxes_matrix):
     """
     Checks for intersection over union between a matrix of boxes and a template box and returns indices
-    of boxes from the matrix that have intersection over union with the template box aboves 0.5
+    of boxes from the matrix that have intersection over union with the template box above 0.5
     :param template_box: bounding box tuple (x_left, y_top, x_right, y_bottom)
     :param boxes_matrix: 2D numpy array of boxes in [x_left, y_top, x_right, y_bottom] order
     :return: 1D array of ints
