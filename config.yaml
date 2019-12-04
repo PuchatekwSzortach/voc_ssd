@@ -68,4 +68,4 @@ train:
   reduce_learning_rate_factor: 0.1
 
 model_checkpoint_path: "../../data/voc_ssd_models/current_model/"
-best_model_checkpoint_path: "../../data/voc_ssd_models/best_model/"
+best_model_checkpoint_path: "../../data/voc_ssd_models/current_model/"

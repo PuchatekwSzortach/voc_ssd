@@ -3,6 +3,7 @@ Module with SSD-specific computations
 """
 
 import numpy as np
+import tensorflow as tf
 
 import net.utilities
 
@@ -60,6 +61,33 @@ class DefaultBoxesFactory:
 
         boxes_matrices = []
 
+        # Boxes must be laid out in (y, x, boxes configurations) order, since that's how
+        # convolutional network will lay them out in memory
+        for y_center in np.arange(step // 2, image_shape[0], step):
+
+            for x_center in np.arange(step // 2, image_shape[1], step):
+
+                boxes_matrix = DefaultBoxesFactory.get_boxes_at_location(
+                    y_center=y_center,
+                    x_center=x_center,
+                    configuration=configuration)
+
+                boxes_matrices.append(boxes_matrix)
+
+        return np.concatenate(boxes_matrices)
+
+    @staticmethod
+    def get_boxes_at_location(y_center, x_center, configuration):
+        """
+        Get all boxes variations at specified center location
+        :param y_center: int
+        :param x_center: int
+        :param configuration: dictionary with configuration options
+        :return:
+        """
+
+        boxes = []
+
         for base_size in configuration["base_bounding_box_sizes"]:
 
             # Vertical boxes
@@ -68,10 +96,11 @@ class DefaultBoxesFactory:
                 width = aspect_ratio * base_size
                 height = base_size
 
-                boxes_matrix = DefaultBoxesFactory.get_single_configuration_boxes_matrix(
-                    image_shape, step, width, height)
+                half_width = width / 2
+                half_height = height / 2
 
-                boxes_matrices.append(boxes_matrix)
+                box = [x_center - half_width, y_center - half_height, x_center + half_width, y_center + half_height]
+                boxes.append(box)
 
             # Horizontal boxes
             for aspect_ratio in configuration["aspect_ratios"]:
@@ -79,41 +108,13 @@ class DefaultBoxesFactory:
                 width = base_size
                 height = aspect_ratio * base_size
 
-                boxes_matrix = DefaultBoxesFactory.get_single_configuration_boxes_matrix(
-                    image_shape, step, width, height)
+                half_width = width / 2
+                half_height = height / 2
 
-                boxes_matrices.append(boxes_matrix)
+                box = [x_center - half_width, y_center - half_height, x_center + half_width, y_center + half_height]
+                boxes.append(box)
 
-        return np.concatenate(boxes_matrices)
-
-    @staticmethod
-    def get_single_configuration_boxes_matrix(image_shape, step, width, height):
-        """
-        Gets default bounding boxes matrix for a single configuration
-        :param image_shape: tuple (height, width)
-        :param step: int, distance between neighbouring boxes
-        :param width: float, box width
-        :param height: float, box height
-        :return: 2D numpy array
-        """
-
-        # First get a vector of centers in x and y directions
-        y_centers = np.arange(step // 2, image_shape[0], step)
-        x_centers = np.arange(step // 2, image_shape[1], step)
-
-        y_steps = len(y_centers)
-        x_steps = len(x_centers)
-
-        # Now repeat x and y centers to create (x, y) paris for each case, and cast both to column vectors
-        y_centers = np.repeat(y_centers, x_steps).reshape(-1, 1)
-        x_centers = np.tile(x_centers, y_steps).reshape(-1, 1)
-
-        half_width = width / 2
-        half_height = height / 2
-
-        return np.concatenate(
-            [x_centers - half_width, y_centers - half_height, x_centers + half_width, y_centers + half_height],
-            axis=1)
+        return np.array(boxes)
 
 
 def get_matching_analysis_generator(ssd_model_configuration, ssd_input_generator):
@@ -216,20 +217,71 @@ def get_predicted_annotations(default_boxes_matrix, softmax_predictions_matrix, 
     :return: list of net.data.Annotation instances
     """
 
-    print("softmax_predictions_matrix shape: {}".format(softmax_predictions_matrix.shape))
-
     # Get a selector for non-background predictions over threshold
-    # predictions_selector = \
-    #     (np.argmax(softmax_predictions_matrix, axis=1) > 0) & \
-    #     (np.max(softmax_predictions_matrix, axis=1) > threshold)
+    predictions_selector = \
+        (np.argmax(softmax_predictions_matrix, axis=1) > 0) & \
+        (np.max(softmax_predictions_matrix, axis=1) > threshold)
 
-    predictions_selector = np.argmax(softmax_predictions_matrix, axis=1) > 0
+    predictions_boxes = default_boxes_matrix[predictions_selector]
+    predictions_categories_indices = np.argmax(softmax_predictions_matrix[predictions_selector], axis=1)
 
-    print("Predictions selector sum: {}".format(np.sum(predictions_selector)))
+    annotations = []
 
-    selected_predictions_confidences = np.max(softmax_predictions_matrix[predictions_selector], axis=1)
-    # print(selected_predictions_confidences)
-    # print(selected_predictions_confidences.shape)
+    for box, category_id in zip(predictions_boxes, predictions_categories_indices):
 
-    return []
+        annotation = net.utilities.Annotation(
+            bounding_box=[int(x) for x in box],
+            label=categories[category_id],
+            category_id=category_id)
 
+        annotations.append(annotation)
+
+    return annotations
+
+
+def get_single_shot_detector_loss_op(
+        default_boxes_categories_ids_vector_op, predictions_logits_matrix_op, hard_negatives_mining_ratio):
+    """
+    Function to create single shot detector loss op
+    :param default_boxes_categories_ids_vector_op: tensorflow tensor with shape (None,) and int type
+    :param predictions_logits_matrix_op: tensorflow tensor with shape (None, None) and float type
+    :param hard_negatives_mining_ratio: int - specifies ratio of hard negatives to positive samples loss op
+    should use
+    :return: scalar loss op
+    """
+
+    default_boxes_count = tf.shape(default_boxes_categories_ids_vector_op)[0]
+
+    raw_loss_op = tf.nn.sparse_softmax_cross_entropy_with_logits(
+        labels=default_boxes_categories_ids_vector_op, logits=predictions_logits_matrix_op)
+
+    all_ones_op = tf.ones(shape=(default_boxes_count,), dtype=tf.float32)
+    all_zeros_op = tf.zeros(shape=(default_boxes_count,), dtype=tf.float32)
+
+    # Get a selector that's set to 1 where for all positive losses, split positive losses and negatives losses
+    positive_losses_selector_op = tf.where(
+        default_boxes_categories_ids_vector_op > 0, all_ones_op, all_zeros_op)
+
+    positive_matches_count_op = tf.cast(tf.reduce_sum(positive_losses_selector_op), tf.int32)
+
+    # Get positive losses op - that is op with losses only for default bounding boxes
+    # that were matched with ground truth annotations.
+    # First multiply raw losses with selector op, so that all negative losses will be zero.
+    # Then sort losses in descending order and select positive_matches_count elements.
+    # Thus end effect is that we select positive losses only
+    positive_losses_op = tf.sort(
+        raw_loss_op * positive_losses_selector_op, direction='DESCENDING')[:positive_matches_count_op]
+
+    # Get negative losses op that is op with losses for default boxes that weren't matched with any ground truth
+    # annotations, or should predict background, in a similar manner as we did for positive losses.
+    # Choose x times positive matches count largest losses only for hard negatives mining
+    negative_losses_op = tf.sort(
+        raw_loss_op * (1.0 - positive_losses_selector_op),
+        direction='DESCENDING')[:(hard_negatives_mining_ratio * positive_matches_count_op)]
+
+    # If there were any positive matches at all, then return mean of both losses.
+    # Otherwise return 0 - as we can't have a mean of an empty op.
+    return tf.cond(
+        pred=positive_matches_count_op > 0,
+        true_fn=lambda: tf.reduce_mean(tf.concat([positive_losses_op, negative_losses_op], axis=0)),
+        false_fn=lambda: tf.constant(0, dtype=tf.float32))
