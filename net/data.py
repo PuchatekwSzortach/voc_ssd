@@ -8,6 +8,7 @@ import random
 import queue
 import threading
 
+import imgaug.augmenters
 import numpy as np
 import xmltodict
 import cv2
@@ -106,7 +107,9 @@ class VOCSamplesDataLoader:
     Data loader that yields (image, annotations) pairs
     """
 
-    def __init__(self, data_directory, data_set_path, categories, size_factor, objects_filtering_config=None):
+    def __init__(
+            self, data_directory, data_set_path,
+            categories, size_factor, objects_filtering_config=None, augmentation_pipeline=None):
         """
         Constructor
         :param data_directory: path to VOC dataset directory
@@ -117,6 +120,8 @@ class VOCSamplesDataLoader:
         data sets
         :param objects_filtering_config: dictionary, defaults to None. If provided, data loader
         will drop annotations based on filtering options
+        :param augmentation_pipeline: imagaug.augmenters.Augmenter instance, optional, if not None, then it's used
+        to augment image
         """
 
         self.data_directory = data_directory
@@ -127,6 +132,7 @@ class VOCSamplesDataLoader:
         self.size_factor = size_factor
 
         self.objects_filtering_config = objects_filtering_config
+        self.augmentation_pipeline = augmentation_pipeline
 
     def __len__(self):
 
@@ -167,6 +173,10 @@ class VOCSamplesDataLoader:
 
                 for index, bounding_box in enumerate(resized_bounding_boxes):
                     objects_annotations[index].bounding_box = bounding_box
+
+                if self.augmentation_pipeline is not None:
+
+                    image = self.augmentation_pipeline.augment_image(image)
 
                 yield ImageProcessor.get_normalized_image(image), objects_annotations
 
@@ -228,3 +238,19 @@ class BackgroundDataLoader:
 
         self._samples_queue.join()
         self._samples_generation_thread.join()
+
+
+def get_image_augmentation_pipeline():
+    """
+    Get image agumentation pipeline
+    :return: imgaug.augmenters.Augmenter instance
+    """
+
+    return imgaug.augmenters.SomeOf(
+        n=(0, 3),
+        children=[
+            imgaug.augmenters.Fliplr(0.5),  # horizontal flips
+            imgaug.augmenters.Affine(scale=(0.5, 2.0)),
+            imgaug.augmenters.Affine(rotate=(-15, 15))
+        ],
+        random_order=True)

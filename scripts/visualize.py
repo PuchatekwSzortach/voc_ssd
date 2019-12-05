@@ -27,7 +27,8 @@ def log_voc_samples_generator_output(logger, config):
         data_directory=config["voc"]["data_directory"],
         data_set_path=config["voc"]["validation_set_path"],
         categories=config["categories"],
-        size_factor=config["size_factor"])
+        size_factor=config["size_factor"],
+        augmentation_pipeline=net.data.get_image_augmentation_pipeline())
 
     generator = iter(samples_loader)
 
