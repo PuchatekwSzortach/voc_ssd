@@ -63,7 +63,6 @@ def get_annotated_image(image, annotations, colors, draw_labels=True, font_path=
 
     # Else draw labels as well
     pil_image = PIL.Image.fromarray(annotated_image)
-
     font = PIL.ImageFont.truetype(font_path, size=20)
 
     for annotation, color in zip(annotations, colors):

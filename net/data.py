@@ -2,14 +2,16 @@
 Data generators and other data-related code
 """
 
-import os
 import copy
+import os
 import random
-import threading
 import queue
+import threading
 
+import numpy as np
 import xmltodict
 import cv2
+
 
 import net.utilities
 
@@ -60,6 +62,32 @@ def get_objects_annotations(image_annotations, labels_to_categories_index_map):
         annotations.append(annotation)
 
     return annotations
+
+
+class ImageProcessor:
+    """
+    Simple class wrapping up normalization and denormalization routines
+    """
+
+    @staticmethod
+    def get_normalized_image(image):
+        """
+        Get normalized image
+        :param image: numpy array
+        :return: numpy array
+        """
+
+        return np.float32(image / 255.0) - 0.5
+
+    @staticmethod
+    def get_denormalized_image(image):
+        """
+        Transform normalized image back to original scale
+        :param image: numpy array
+        :return: numpy array
+        """
+
+        return np.uint8(255 * (image + 0.5))
 
 
 class DataBunch:
@@ -140,7 +168,7 @@ class VOCSamplesDataLoader:
                 for index, bounding_box in enumerate(resized_bounding_boxes):
                     objects_annotations[index].bounding_box = bounding_box
 
-                yield image, objects_annotations
+                yield ImageProcessor.get_normalized_image(image), objects_annotations
 
 
 class BackgroundDataLoader:
