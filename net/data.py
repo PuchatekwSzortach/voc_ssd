@@ -157,28 +157,52 @@ class VOCSamplesDataLoader:
 
                     image_annotations = xmltodict.parse(file.read())
 
-                objects_annotations = get_objects_annotations(image_annotations, self.labels_to_categories_index_map)
+                annotations = get_objects_annotations(image_annotations, self.labels_to_categories_index_map)
+
+                if self.augmentation_pipeline is not None:
+
+                    image, annotations = self._get_augmented_sample(image, annotations)
 
                 if self.objects_filtering_config is not None:
 
                     # Discard odd sized annotations
-                    objects_annotations = \
-                        [annotation for annotation in objects_annotations
+                    annotations = \
+                        [annotation for annotation in annotations
                          if not net.utilities.is_annotation_size_unusual(annotation, **self.objects_filtering_config)]
 
-                bounding_boxes = [annotation.bounding_box for annotation in objects_annotations]
+                bounding_boxes = [annotation.bounding_box for annotation in annotations]
 
                 image, resized_bounding_boxes = net.utilities.get_resized_sample(
                     image, bounding_boxes, size_factor=self.size_factor)
 
                 for index, bounding_box in enumerate(resized_bounding_boxes):
-                    objects_annotations[index].bounding_box = bounding_box
+                    annotations[index].bounding_box = bounding_box
 
-                if self.augmentation_pipeline is not None:
+                yield ImageProcessor.get_normalized_image(image), annotations
 
-                    image = self.augmentation_pipeline.augment_image(image)
+    def _get_augmented_sample(self, image, annotations):
+        """
+        Augment samples
+        :param image: np.array
+        :param annotations: list of net.utilities.Annotation nstances
+        :return: tuple (image, annotations)
+        """
 
-                yield ImageProcessor.get_normalized_image(image), objects_annotations
+        bounding_boxes_container = imgaug.augmentables.BoundingBoxesOnImage(
+            bounding_boxes=[imgaug.augmentables.BoundingBox(*annotation.bounding_box) for annotation in annotations],
+            shape=image.shape)
+
+        augmented_image, augmented_bounding_boxes_container = self.augmentation_pipeline(
+            image=image,
+            bounding_boxes=bounding_boxes_container)
+
+        augmented_annotations = [net.utilities.Annotation(
+            bounding_box=[bounding_box.x1_int, bounding_box.y1_int, bounding_box.x2_int, bounding_box.y2_int],
+            label=annotation.label,
+            category_id=annotation.category_id
+        ) for (annotation, bounding_box) in zip(annotations, augmented_bounding_boxes_container.bounding_boxes)]
+
+        return augmented_image, augmented_annotations
 
 
 class BackgroundDataLoader:
@@ -247,10 +271,12 @@ def get_image_augmentation_pipeline():
     """
 
     return imgaug.augmenters.SomeOf(
-        n=(0, 3),
+        n=(2, 4),
         children=[
-            imgaug.augmenters.Fliplr(0.5),  # horizontal flips
-            imgaug.augmenters.Affine(scale=(0.5, 2.0)),
+            # horizontal flips
+            imgaug.augmenters.Fliplr(0.5),
+            # scale, we mostly want to scale down to obtain more smaller objects
+            imgaug.augmenters.Affine(scale=(0.5, 1.2)),
             imgaug.augmenters.Affine(rotate=(-15, 15))
         ],
         random_order=True)

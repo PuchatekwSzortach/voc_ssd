@@ -15,6 +15,26 @@ import net.ssd
 import net.utilities
 
 
+def get_trained_model(config, model_checkpoint_path):
+    """
+    Utility to create SSD model and load its weights
+    :param config: dictionary with configuration parameters
+    :param model_checkpoint_path: str, path to model checkpoint directory
+    :return: net.ml.VGGishModel instance
+    """
+
+    network = net.ml.VGGishNetwork(
+        model_configuration=config["vggish_model_configuration"],
+        categories_count=len(config["categories"]))
+
+    session = tf.keras.backend.get_session()
+
+    model = net.ml.VGGishModel(session, network)
+    model.load(model_checkpoint_path)
+
+    return model
+
+
 def main():
     """
     Script entry point
@@ -28,14 +48,7 @@ def main():
     with open(arguments.config) as file:
         config = yaml.safe_load(file)
 
-    network = net.ml.VGGishNetwork(
-        model_configuration=config["vggish_model_configuration"],
-        categories_count=len(config["categories"]))
-
-    session = tf.keras.backend.get_session()
-
-    model = net.ml.VGGishModel(session, network)
-    model.load(config["best_model_checkpoint_path"])
+    model = get_trained_model(config, model_checkpoint_path=config["best_model_checkpoint_path"])
 
     validation_samples_loader = net.data.VOCSamplesDataLoader(
         data_directory=config["voc"]["data_directory"],
@@ -48,12 +61,16 @@ def main():
 
     default_boxes_factory = net.ssd.DefaultBoxesFactory(model_configuration=config["vggish_model_configuration"])
 
+    thresholds_matching_data_map = net.analysis.MatchingDataComputer(
+        samples_loader=validation_samples_loader,
+        model=model,
+        default_boxes_factory=default_boxes_factory,
+        thresholds=[0, 0.5, 0.9],
+        categories=config["categories"]).get_thresholds_matched_data_map()
+
     net.analysis.log_precision_recall_analysis(
         logger=logger,
-        model=model,
-        samples_loader=validation_samples_loader,
-        default_boxes_factory=default_boxes_factory,
-        config=config)
+        thresholds_matching_data_map=thresholds_matching_data_map)
 
 
 if __name__ == "__main__":

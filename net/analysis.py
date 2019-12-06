@@ -142,28 +142,19 @@ def get_precision_recall_analysis_report(
     return " ".join(messages)
 
 
-def log_precision_recall_analysis(logger, model, samples_loader, default_boxes_factory, config):
+def log_precision_recall_analysis(logger, thresholds_matching_data_map):
     """
     Log precision recall analysis
     :param logger: logger instance
-    :param model: net.ml.VGGishModel instance
-    :param samples_loader: net.data.VOCSamplesDataLoader instance
-    :param default_boxes_factory: net.ssd.DefaultBoxesFactory instance
-    :param config: dictionary with configuration options
+    :param thresholds_matching_data_map: dictionary, each key is a float and value is a dictionary with
+    info about matched and unmatched annotations and predictions at corresponding threshold
     """
 
-    thresholds_matched_data_map = MatchingDataComputer(
-        samples_loader=samples_loader,
-        model=model,
-        default_boxes_factory=default_boxes_factory,
-        thresholds=[0, 0.5, 0.9],
-        categories=config["categories"]).get_thresholds_matched_data_map()
-
-    for threshold in sorted(thresholds_matched_data_map.keys()):
+    for threshold in sorted(thresholds_matching_data_map.keys()):
 
         logger.info("At threshold {}<br>".format(threshold))
 
-        matching_data = thresholds_matched_data_map[threshold]
+        matching_data = thresholds_matching_data_map[threshold]
 
         report = get_precision_recall_analysis_report(
             matched_annotations=matching_data["matched_annotations"],
