@@ -27,7 +27,8 @@ def log_voc_samples_generator_output(logger, config):
         data_directory=config["voc"]["data_directory"],
         data_set_path=config["voc"]["validation_set_path"],
         categories=config["categories"],
-        size_factor=config["size_factor"])
+        size_factor=config["size_factor"],
+        augmentation_pipeline=net.data.get_image_augmentation_pipeline())
 
     generator = iter(samples_loader)
 
@@ -39,7 +40,12 @@ def log_voc_samples_generator_output(logger, config):
 
         colors = [categories_to_colors_map[annotation.label] for annotation in annotations]
 
-        image = net.plot.get_annotated_image(image, annotations, colors, config["font_path"])
+        image = net.plot.get_annotated_image(
+            image=net.data.ImageProcessor.get_denormalized_image(image),
+            annotations=annotations,
+            colors=colors,
+            draw_labels=True,
+            font_path=config["font_path"])
 
         labels = [annotation.label for annotation in annotations]
         message = "{} - {}".format(image.shape[:2], labels)
@@ -59,7 +65,12 @@ def log_sample_with_odd_sized_annotation(logger, image, annotations, categories_
 
     colors = [categories_to_colors_map[annotation.label] for annotation in annotations]
 
-    image = net.plot.get_annotated_image(image, annotations, colors, font_path)
+    image = net.plot.get_annotated_image(
+        image=image,
+        annotations=annotations,
+        colors=colors,
+        draw_labels=True,
+        font_path=font_path)
 
     labels = []
 
@@ -116,7 +127,11 @@ def log_samples_with_odd_sized_annotations(logger, config):
         if len(unusual_sized_annotations) > 0:
 
             log_sample_with_odd_sized_annotation(
-                logger, image, unusual_sized_annotations, categories_to_colors_map, config["font_path"])
+                logger=logger,
+                image=net.data.ImageProcessor.get_denormalized_image(image),
+                annotations=unusual_sized_annotations,
+                categories_to_colors_map=categories_to_colors_map,
+                font_path=config["font_path"])
 
     print("Unusual object sizes counts to objects count: {}/{}".format(
         unusual_sized_annotation_count, all_annotations_count))
@@ -149,10 +164,17 @@ def log_default_boxes_matches_for_single_sample(
         annotations_colors = [categories_to_colors_map[annotation.label] for annotation in annotations]
 
         annotated_image = net.plot.get_annotated_image(
-            image, annotations, colors=annotations_colors, draw_labels=True, font_path=font_path)
+            image=net.data.ImageProcessor.get_denormalized_image(image),
+            annotations=annotations,
+            colors=annotations_colors,
+            draw_labels=True,
+            font_path=font_path)
 
         matched_boxes = default_boxes_matrix[all_matched_default_boxes_indices]
-        matched_boxes_image = net.plot.get_image_with_boxes(image, matched_boxes, color=(0, 255, 0))
+        matched_boxes_image = net.plot.get_image_with_boxes(
+            image=net.data.ImageProcessor.get_denormalized_image(image),
+            boxes=matched_boxes,
+            color=(0, 255, 0))
 
         logger.info(vlogging.VisualRecord("Default boxes", [annotated_image, matched_boxes_image]))
 
@@ -205,10 +227,14 @@ def log_ssd_training_loop_data_loader_outputs(logger, config):
         default_boxes_matrix = default_boxes_factory.get_default_boxes_matrix(image.shape)
 
         matched_boxes = default_boxes_matrix[default_boxes_categories_ids_vector > 0]
-        matched_boxes_image = net.plot.get_image_with_boxes(image, matched_boxes, color=(0, 255, 0))
+        matched_boxes_image = net.plot.get_image_with_boxes(
+            image=net.data.ImageProcessor.get_denormalized_image(image),
+            boxes=matched_boxes,
+            color=(0, 255, 0))
 
         logger.info(vlogging.VisualRecord(
-            "image and default boxes matches", [image, matched_boxes_image]))
+            "image and default boxes matches",
+            [net.data.ImageProcessor.get_denormalized_image(image), matched_boxes_image]))
 
 
 def log_single_prediction(logger, network, session, default_boxes_factory, samples_iterator, config):
@@ -225,7 +251,7 @@ def log_single_prediction(logger, network, session, default_boxes_factory, sampl
     image, ground_truth_annotations = next(samples_iterator)
 
     ground_truth_annotations_image = net.plot.get_annotated_image(
-        image=image,
+        image=net.data.ImageProcessor.get_denormalized_image(image),
         annotations=ground_truth_annotations,
         colors=[(255, 0, 0)] * len(ground_truth_annotations),
         font_path=config["font_path"])
@@ -244,7 +270,7 @@ def log_single_prediction(logger, network, session, default_boxes_factory, sampl
         threshold=0.5)
 
     predicted_annotations_image = net.plot.get_annotated_image(
-        image=image,
+        image=net.data.ImageProcessor.get_denormalized_image(image),
         annotations=predicted_annotations,
         colors=[(0, 255, 0)] * len(ground_truth_annotations),
         font_path=config["font_path"])
@@ -305,13 +331,13 @@ def main():
 
     logger = net.utilities.get_logger(config["log_path"])
 
-    # log_voc_samples_generator_output(logger, config)
+    log_voc_samples_generator_output(logger, config)
     # log_samples_with_odd_sized_annotations(logger, config)
 
     # log_default_boxes_matches(logger, config)
 
     # log_ssd_training_loop_data_loader_outputs(logger, config)
-    log_predictions(logger, config)
+    # log_predictions(logger, config)
 
 
 if __name__ == "__main__":

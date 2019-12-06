@@ -29,7 +29,8 @@ def get_ssd_training_loop_data_bunch(config):
         data_set_path=config["voc"]["train_set_path"],
         categories=config["categories"],
         size_factor=config["size_factor"],
-        objects_filtering_config=config["objects_filtering"])
+        objects_filtering_config=config["objects_filtering"],
+        augmentation_pipeline=net.data.get_image_augmentation_pipeline())
 
     ssd_training_samples_loader = net.ssd.SSDTrainingLoopDataLoader(
         voc_samples_data_loader=training_samples_loader,

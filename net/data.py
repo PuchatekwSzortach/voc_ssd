@@ -2,14 +2,17 @@
 Data generators and other data-related code
 """
 
-import os
 import copy
+import os
 import random
-import threading
 import queue
+import threading
 
+import imgaug.augmenters
+import numpy as np
 import xmltodict
 import cv2
+
 
 import net.utilities
 
@@ -62,6 +65,32 @@ def get_objects_annotations(image_annotations, labels_to_categories_index_map):
     return annotations
 
 
+class ImageProcessor:
+    """
+    Simple class wrapping up normalization and denormalization routines
+    """
+
+    @staticmethod
+    def get_normalized_image(image):
+        """
+        Get normalized image
+        :param image: numpy array
+        :return: numpy array
+        """
+
+        return np.float32(image / 255.0) - 0.5
+
+    @staticmethod
+    def get_denormalized_image(image):
+        """
+        Transform normalized image back to original scale
+        :param image: numpy array
+        :return: numpy array
+        """
+
+        return np.uint8(255 * (image + 0.5))
+
+
 class DataBunch:
     """
     A simple container for training and validation generators
@@ -78,7 +107,9 @@ class VOCSamplesDataLoader:
     Data loader that yields (image, annotations) pairs
     """
 
-    def __init__(self, data_directory, data_set_path, categories, size_factor, objects_filtering_config=None):
+    def __init__(
+            self, data_directory, data_set_path,
+            categories, size_factor, objects_filtering_config=None, augmentation_pipeline=None):
         """
         Constructor
         :param data_directory: path to VOC dataset directory
@@ -89,6 +120,8 @@ class VOCSamplesDataLoader:
         data sets
         :param objects_filtering_config: dictionary, defaults to None. If provided, data loader
         will drop annotations based on filtering options
+        :param augmentation_pipeline: imagaug.augmenters.Augmenter instance, optional, if not None, then it's used
+        to augment image
         """
 
         self.data_directory = data_directory
@@ -99,6 +132,7 @@ class VOCSamplesDataLoader:
         self.size_factor = size_factor
 
         self.objects_filtering_config = objects_filtering_config
+        self.augmentation_pipeline = augmentation_pipeline
 
     def __len__(self):
 
@@ -123,24 +157,52 @@ class VOCSamplesDataLoader:
 
                     image_annotations = xmltodict.parse(file.read())
 
-                objects_annotations = get_objects_annotations(image_annotations, self.labels_to_categories_index_map)
+                annotations = get_objects_annotations(image_annotations, self.labels_to_categories_index_map)
+
+                if self.augmentation_pipeline is not None:
+
+                    image, annotations = self._get_augmented_sample(image, annotations)
 
                 if self.objects_filtering_config is not None:
 
                     # Discard odd sized annotations
-                    objects_annotations = \
-                        [annotation for annotation in objects_annotations
+                    annotations = \
+                        [annotation for annotation in annotations
                          if not net.utilities.is_annotation_size_unusual(annotation, **self.objects_filtering_config)]
 
-                bounding_boxes = [annotation.bounding_box for annotation in objects_annotations]
+                bounding_boxes = [annotation.bounding_box for annotation in annotations]
 
                 image, resized_bounding_boxes = net.utilities.get_resized_sample(
                     image, bounding_boxes, size_factor=self.size_factor)
 
                 for index, bounding_box in enumerate(resized_bounding_boxes):
-                    objects_annotations[index].bounding_box = bounding_box
+                    annotations[index].bounding_box = bounding_box
 
-                yield image, objects_annotations
+                yield ImageProcessor.get_normalized_image(image), annotations
+
+    def _get_augmented_sample(self, image, annotations):
+        """
+        Augment samples
+        :param image: np.array
+        :param annotations: list of net.utilities.Annotation nstances
+        :return: tuple (image, annotations)
+        """
+
+        bounding_boxes_container = imgaug.augmentables.BoundingBoxesOnImage(
+            bounding_boxes=[imgaug.augmentables.BoundingBox(*annotation.bounding_box) for annotation in annotations],
+            shape=image.shape)
+
+        augmented_image, augmented_bounding_boxes_container = self.augmentation_pipeline(
+            image=image,
+            bounding_boxes=bounding_boxes_container)
+
+        augmented_annotations = [net.utilities.Annotation(
+            bounding_box=[bounding_box.x1_int, bounding_box.y1_int, bounding_box.x2_int, bounding_box.y2_int],
+            label=annotation.label,
+            category_id=annotation.category_id
+        ) for (annotation, bounding_box) in zip(annotations, augmented_bounding_boxes_container.bounding_boxes)]
+
+        return augmented_image, augmented_annotations
 
 
 class BackgroundDataLoader:
@@ -200,3 +262,21 @@ class BackgroundDataLoader:
 
         self._samples_queue.join()
         self._samples_generation_thread.join()
+
+
+def get_image_augmentation_pipeline():
+    """
+    Get image agumentation pipeline
+    :return: imgaug.augmenters.Augmenter instance
+    """
+
+    return imgaug.augmenters.SomeOf(
+        n=(2, 4),
+        children=[
+            # horizontal flips
+            imgaug.augmenters.Fliplr(0.5),
+            # scale, we mostly want to scale down to obtain more smaller objects
+            imgaug.augmenters.Affine(scale=(0.5, 1.2)),
+            imgaug.augmenters.Affine(rotate=(-15, 15))
+        ],
+        random_order=True)
