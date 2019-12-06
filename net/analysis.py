@@ -4,8 +4,11 @@ Script with analysis code
 
 import collections
 
+import matplotlib.pyplot as plt
 import numpy as np
+import seaborn
 import tqdm
+import vlogging
 
 import net.ssd
 import net.utilities
@@ -129,14 +132,16 @@ def get_precision_recall_analysis_report(
     """
     messages = []
 
-    message = "Recall is {:.3f}<br>".format(
-        len(matched_annotations) / (len(matched_annotations) + len(unmatched_annotations)))
+    total_annotations_count = len(matched_annotations) + len(unmatched_annotations)
+    recall = len(matched_annotations) / total_annotations_count if total_annotations_count > 0 else 0
 
+    message = "Recall is {:.3f}<br>".format(recall)
     messages.append(message)
 
-    message = "Precision is {:.3f}<br>".format(
-        len(matched_predictions) / (len(matched_predictions) + len(unmatched_predictions)))
+    total_predictions_count = len(matched_predictions) + len(unmatched_predictions)
+    precision = len(matched_predictions) / total_predictions_count if total_predictions_count > 0 else 0
 
+    message = "Precision is {:.3f}<br>".format(precision)
     messages.append(message)
 
     return " ".join(messages)
@@ -164,3 +169,84 @@ def log_precision_recall_analysis(logger, thresholds_matching_data_map):
 
         logger.info(report)
         logger.info("<br>")
+
+
+def get_heatmap(data, bin_size, max_size):
+    """
+    Given a 2D data, compute its heatmap.
+    Heatmap bins data into max_size // step bins, with all data falling outside of heatmap's max_size excluded
+    :param data: 2D numpy array
+    :param bin_size: int, size of a single bin
+    :param max_size: size of the largest bin
+    :return: 2D array
+    """
+
+    # Bin annotations into our loosely defined bins
+    bins_count = max_size // bin_size
+
+    heatmap = np.zeros(shape=(bins_count, bins_count), dtype=np.int32)
+
+    coordinates = data // bin_size
+
+    coordinates_of_data_points_within_max_size = coordinates[np.all(coordinates < bins_count, axis=1)]
+
+    for y, x in coordinates_of_data_points_within_max_size:
+
+        heatmap[y, x] += 1
+
+    return heatmap
+
+
+def get_annotations_sizes_heatmap_figure(annotations, bin_size, max_size):
+    """
+    Get a figure of annotations sizes heatmap
+    :param annotations: list of net.utilities.Annotation instances
+    :param bin_size: int, step at which sizes should be binned
+    :param max_size: int max size of heatmap. Anything above it will be binned to largest bin
+    :return: matplotlib pyplot figure instance
+    """
+
+    data = np.array([(annotation.height, annotation.width) for annotation in annotations])
+    annotations_heatmap = net.analysis.get_heatmap(data=data, bin_size=bin_size, max_size=max_size)
+
+    figure = plt.figure()
+    seaborn.heatmap(data=annotations_heatmap)
+
+    bins_count = max_size // bin_size
+    original_ticks = np.arange(bins_count)
+    overwritten_ticks = bin_size * np.arange(bins_count)
+
+    plt.xticks(original_ticks, overwritten_ticks, rotation=90)
+    plt.yticks(original_ticks, overwritten_ticks, rotation=0)
+
+    figure.tight_layout()
+    return figure
+
+
+def log_performance_with_annotations_size_analysis(logger, thresholds_matching_data_map):
+    """
+    Log performance of network across annotations of different sizes
+    :param logger: logger instance
+    :param thresholds_matching_data_map: dictionary, each key is a float and value is a dictionary with
+    info about matched and unmatched annotations and predictions at corresponding threshold
+    """
+
+    # Only use data at threshold 0
+    unmatched_annotations = thresholds_matching_data_map[0]["unmatched_annotations"]
+
+    unmatched_annotations_heatmap_figure = get_annotations_sizes_heatmap_figure(
+        annotations=unmatched_annotations,
+        bin_size=20,
+        max_size=500)
+
+    logger.info(vlogging.VisualRecord(
+        "Unmatched annotations heatmap", unmatched_annotations_heatmap_figure))
+
+    small_unmatched_annotations_heatmap_figure = get_annotations_sizes_heatmap_figure(
+        annotations=unmatched_annotations,
+        bin_size=5,
+        max_size=100)
+
+    logger.info(vlogging.VisualRecord(
+        "Small unmatched annotations heatmap", small_unmatched_annotations_heatmap_figure))
+

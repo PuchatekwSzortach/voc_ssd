@@ -48,7 +48,7 @@ def main():
     with open(arguments.config) as file:
         config = yaml.safe_load(file)
 
-    model = get_trained_model(config, model_checkpoint_path=config["best_model_checkpoint_path"])
+    model = get_trained_model(config, model_checkpoint_path=config["model_checkpoint_path"])
 
     validation_samples_loader = net.data.VOCSamplesDataLoader(
         data_directory=config["voc"]["data_directory"],
@@ -69,6 +69,10 @@ def main():
         categories=config["categories"]).get_thresholds_matched_data_map()
 
     net.analysis.log_precision_recall_analysis(
+        logger=logger,
+        thresholds_matching_data_map=thresholds_matching_data_map)
+
+    net.analysis.log_performance_with_annotations_size_analysis(
         logger=logger,
         thresholds_matching_data_map=thresholds_matching_data_map)
 
