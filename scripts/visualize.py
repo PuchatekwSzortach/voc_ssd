@@ -188,8 +188,7 @@ def log_default_boxes_matches(logger, config):
         data_directory=config["voc"]["data_directory"],
         data_set_path=config["voc"]["validation_set_path"],
         categories=config["categories"],
-        size_factor=config["size_factor"],
-        objects_filtering_config=config["objects_filtering"])
+        size_factor=config["size_factor"])
 
     default_boxes_factory = net.ssd.DefaultBoxesFactory(config["vggish_model_configuration"])
     categories_to_colors_map = net.utilities.get_categories_to_colors_map(config["categories"])
@@ -209,8 +208,7 @@ def log_ssd_training_loop_data_loader_outputs(logger, config):
         data_directory=config["voc"]["data_directory"],
         data_set_path=config["voc"]["validation_set_path"],
         categories=config["categories"],
-        size_factor=config["size_factor"],
-        objects_filtering_config=config["objects_filtering"])
+        size_factor=config["size_factor"])
 
     ssd_validation_samples_loader = net.ssd.SSDTrainingLoopDataLoader(
         voc_samples_data_loader=samples_loader,
@@ -299,8 +297,7 @@ def log_predictions(logger, config):
         data_directory=config["voc"]["data_directory"],
         data_set_path=config["voc"]["validation_set_path"],
         categories=config["categories"],
-        size_factor=config["size_factor"],
-        objects_filtering_config=config["objects_filtering"])
+        size_factor=config["size_factor"])
 
     default_boxes_factory = net.ssd.DefaultBoxesFactory(model_configuration=config["vggish_model_configuration"])
     iterator = iter(validation_samples_loader)

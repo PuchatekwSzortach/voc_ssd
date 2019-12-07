@@ -34,11 +34,6 @@ font_path: "/usr/share/fonts/truetype/msttcorefonts/arial.ttf"
 # Size factor to which images should be rescaled
 size_factor: 32
 
-objects_filtering:
-  minimum_size: 15
-  minimum_aspect_ratio: 0.2
-  maximum_aspect_ratio: 5
-
 
 vggish_model_configuration:
     prediction_heads_order: ["block2_head", "block3_head", "block4_head", "block5_head"]
