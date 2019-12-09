@@ -40,23 +40,23 @@ vggish_model_configuration:
     block2_head:
       image_downscale_factor: 4
       base_bounding_box_sizes: [25]
-      aspect_ratios: [1]
+      aspect_ratios: [0.6, 0.8, 1]
     block3_head:
       image_downscale_factor: 8
-      base_bounding_box_sizes: [50]
-      aspect_ratios: [0.4, 0.6, 1]
+      base_bounding_box_sizes: [40, 60]
+      aspect_ratios: [0.4, 0.6, 0.8, 1]
     block4_head:
       image_downscale_factor: 16
-      base_bounding_box_sizes: [100, 80]
-      aspect_ratios: [0.4, 0.6, 1]
+      base_bounding_box_sizes: [80, 100]
+      aspect_ratios: [0.4, 0.6, 0.8, 1]
     block5_head:
       image_downscale_factor: 32
       base_bounding_box_sizes: [300, 150]
-      aspect_ratios: [0.4, 0.6, 1]
+      aspect_ratios: [0.4, 0.6, 0.8, 1]
 
 
 train:
-  epochs: 100
+  epochs: 200
   learning_rate: 0.00001
   early_stopping_patience: 5
   reduce_learning_rate_patience: 2

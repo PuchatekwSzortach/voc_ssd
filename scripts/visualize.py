@@ -328,13 +328,13 @@ def main():
 
     logger = net.utilities.get_logger(config["log_path"])
 
-    log_voc_samples_generator_output(logger, config)
+    # log_voc_samples_generator_output(logger, config)
     # log_samples_with_odd_sized_annotations(logger, config)
 
     # log_default_boxes_matches(logger, config)
 
     # log_ssd_training_loop_data_loader_outputs(logger, config)
-    # log_predictions(logger, config)
+    log_predictions(logger, config)
 
 
 if __name__ == "__main__":
