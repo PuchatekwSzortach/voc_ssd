@@ -260,13 +260,13 @@ def get_image_augmentation_pipeline():
     :return: imgaug.augmenters.Augmenter instance
     """
 
-    return imgaug.augmenters.SomeOf(
-        n=(0, 3),
+    return imgaug.augmenters.Sequential(
         children=[
-            # horizontal flips
-            imgaug.augmenters.Fliplr(0.5),
-            # scale, we mostly want to scale down to obtain more smaller objects
-            imgaug.augmenters.Affine(scale=(0.5, 1.2)),
-            imgaug.augmenters.Affine(rotate=(-15, 15))
-        ],
-        random_order=True)
+            imgaug.augmenters.SomeOf(
+                n=(0, 3),
+                children=[],
+                random_order=True),
+            # imgaug.augmenters.Affine(scale=(0.5, 1.2)),
+            # imgaug.augmenters.Affine(rotate=(-15, 15)),
+            # Left-right flip
+            imgaug.augmenters.Fliplr(0.5)])

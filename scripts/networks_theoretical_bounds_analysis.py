@@ -22,8 +22,7 @@ def analyse_theoretical_performance(config):
         data_directory=config["voc"]["data_directory"],
         data_set_path=config["voc"]["validation_set_path"],
         categories=config["categories"],
-        size_factor=config["size_factor"],
-        objects_filtering_config=config["objects_filtering"])
+        size_factor=config["size_factor"])
 
     matching_analysis_generator = net.ssd.get_matching_analysis_generator(
         config["vggish_model_configuration"], iter(voc_samples_loader))
