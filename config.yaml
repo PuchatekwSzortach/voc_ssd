@@ -43,7 +43,7 @@ vggish_model_configuration:
       aspect_ratios: [0.6, 0.8, 1]
     block3_head:
       image_downscale_factor: 8
-      base_bounding_box_sizes: [40, 60]
+      base_bounding_box_sizes: [30, 40, 60]
       aspect_ratios: [0.4, 0.6, 0.8, 1]
     block4_head:
       image_downscale_factor: 16
