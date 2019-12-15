@@ -285,3 +285,24 @@ def get_single_shot_detector_loss_op(
         pred=positive_matches_count_op > 0,
         true_fn=lambda: tf.reduce_mean(tf.concat([positive_losses_op, negative_losses_op], axis=0)),
         false_fn=lambda: tf.constant(0, dtype=tf.float32))
+
+
+def get_matched_default_boxes(annotations, default_boxes_matrix):
+    """
+    Get default boxes that matched annotations
+    :param annotations: list of Annotation instances
+    :param default_boxes_matrix: 2D numpy array of default boxes
+    :return: 2D numpy array of default boxes
+    """
+
+    # Get default boxes matches
+    all_matched_default_boxes_indices = []
+
+    for annotation in annotations:
+
+        matched_default_boxes_indices = net.utilities.get_matched_boxes_indices(
+            annotation.bounding_box, default_boxes_matrix)
+
+        all_matched_default_boxes_indices.extend(matched_default_boxes_indices.tolist())
+
+    return default_boxes_matrix[all_matched_default_boxes_indices]

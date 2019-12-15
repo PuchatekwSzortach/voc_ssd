@@ -179,6 +179,35 @@ def log_default_boxes_matches_for_single_sample(
         logger.info(vlogging.VisualRecord("Default boxes", [annotated_image, matched_boxes_image]))
 
 
+def get_default_boxes_matches_image(image, annotations, default_boxes_matrix):
+    """
+    Get image with default boxes matched to annotations
+    :param image: 3D numpy array
+    :param annotations: list of Annotation instances
+    :param default_boxes_matrix: 2D array of default boxes
+    :return: 3D numpy array
+    """
+
+    # Get default boxes matches
+    all_matched_default_boxes_indices = []
+
+    for annotation in annotations:
+
+        matched_default_boxes_indices = net.utilities.get_matched_boxes_indices(
+            annotation.bounding_box, default_boxes_matrix)
+
+        all_matched_default_boxes_indices.extend(matched_default_boxes_indices.tolist())
+
+    matched_boxes = default_boxes_matrix[all_matched_default_boxes_indices]
+
+    matched_boxes_image = net.plot.get_image_with_boxes(
+        image=image,
+        boxes=matched_boxes,
+        color=(0, 255, 0))
+
+    return matched_boxes_image
+
+
 def log_default_boxes_matches(logger, config):
     """
     Log default boxes matches
@@ -270,7 +299,7 @@ def log_single_prediction(logger, network, session, default_boxes_factory, sampl
     predicted_annotations_image = net.plot.get_annotated_image(
         image=net.data.ImageProcessor.get_denormalized_image(image),
         annotations=predicted_annotations,
-        colors=[(0, 255, 0)] * len(ground_truth_annotations),
+        colors=[(0, 255, 0)] * len(predicted_annotations),
         font_path=config["font_path"])
 
     logger.info(vlogging.VisualRecord(
@@ -291,7 +320,7 @@ def log_predictions(logger, config):
     session = tf.keras.backend.get_session()
 
     model = net.ml.VGGishModel(session, network)
-    model.load(config["best_model_checkpoint_path"])
+    model.load(config["model_checkpoint_path"])
 
     validation_samples_loader = net.data.VOCSamplesDataLoader(
         data_directory=config["voc"]["data_directory"],
@@ -305,6 +334,130 @@ def log_predictions(logger, config):
     for _ in tqdm.tqdm(range(40)):
 
         log_single_prediction(
+            logger=logger,
+            network=network,
+            session=session,
+            default_boxes_factory=default_boxes_factory,
+            samples_iterator=iterator,
+            config=config)
+
+
+def get_single_sample_debugging_visual_record(
+        image, ground_truth_annotations, matched_default_boxes, predicted_annotations, config):
+    """
+    Get debugging visual record for a single sample
+    :param image: 3D numpy array, image
+    :param ground_truth_annotations: list of ground truth Annotation instances
+    :param matched_default_boxes: 2D numpy array of default boxes matched with ground truth annotations
+    :param predicted_annotations: list of predicted Annotation instances
+    :param config: dictionary with configuration parameters
+    :return: vlogging.VisualRecord instance
+    """
+
+    ground_truth_annotations_image = net.plot.get_annotated_image(
+        image=image,
+        annotations=ground_truth_annotations,
+        colors=[(255, 0, 0)] * len(ground_truth_annotations),
+        font_path=config["font_path"])
+
+    matched_boxes_image = net.plot.get_image_with_boxes(
+        image=image,
+        boxes=matched_default_boxes,
+        color=(0, 255, 0))
+
+    predicted_annotations_image = net.plot.get_annotated_image(
+        image=image,
+        annotations=predicted_annotations,
+        colors=[(0, 255, 0)] * len(predicted_annotations),
+        draw_labels=True,
+        font_path=config["font_path"])
+
+    message = "Ground truth annotations count: {}, matched default boxes count: {}, predictions count: {}".format(
+        len(ground_truth_annotations), len(matched_default_boxes), len(predicted_annotations))
+
+    record = vlogging.VisualRecord(
+        title="Debug info",
+        imgs=[
+            image,
+            ground_truth_annotations_image,
+            matched_boxes_image,
+            predicted_annotations_image
+        ],
+        footnotes=message)
+
+    return record
+
+
+def log_single_sample_debugging_info(
+        logger, network, session, default_boxes_factory, samples_iterator, config):
+    """
+    Log debugging info for a single sample. Draws a single sample from samples_iterator
+    :param logger: logger instance
+    :param network: net.ml.VGGishNetwork instance
+    :param session: tensorflow Session instance
+    :param default_boxes_factory: net.ssd.DefaultBoxesFactory instance
+    :param samples_iterator: iterator that yields (image, ground truth annotations) tuples
+    :param config: dictionary with configuration options
+    """
+
+    image, ground_truth_annotations = next(samples_iterator)
+
+    default_boxes_matrix = default_boxes_factory.get_default_boxes_matrix(image.shape)
+
+    matched_default_boxes = net.ssd.get_matched_default_boxes(
+        annotations=ground_truth_annotations,
+        default_boxes_matrix=default_boxes_matrix)
+
+    # Get predictions
+    softmax_predictions_matrix = session.run(
+        network.batch_of_softmax_predictions_matrices_op,
+        feed_dict={network.input_placeholder: np.array([image])})[0]
+
+    # Get annotations boxes and labels from predictions matrix and default boxes matrix
+    predicted_annotations = net.ssd.get_predicted_annotations(
+        default_boxes_matrix=default_boxes_matrix,
+        softmax_predictions_matrix=softmax_predictions_matrix,
+        categories=config["categories"],
+        threshold=0.5)
+
+    record = get_single_sample_debugging_visual_record(
+        image=net.data.ImageProcessor.get_denormalized_image(image),
+        ground_truth_annotations=ground_truth_annotations,
+        matched_default_boxes=matched_default_boxes,
+        predicted_annotations=predicted_annotations,
+        config=config)
+
+    logger.info(record)
+
+
+def log_debugging_info(logger, config):
+    """
+    Log debug info
+    :param logger: logger instance
+    :param config: dictionary with configuration options
+    """
+
+    network = net.ml.VGGishNetwork(
+        model_configuration=config["vggish_model_configuration"],
+        categories_count=len(config["categories"]))
+
+    session = tf.keras.backend.get_session()
+
+    model = net.ml.VGGishModel(session, network)
+    model.load(config["model_checkpoint_path"])
+
+    validation_samples_loader = net.data.VOCSamplesDataLoader(
+        data_directory=config["voc"]["data_directory"],
+        data_set_path=config["voc"]["train_set_path"],
+        categories=config["categories"],
+        size_factor=config["size_factor"])
+
+    default_boxes_factory = net.ssd.DefaultBoxesFactory(model_configuration=config["vggish_model_configuration"])
+    iterator = iter(validation_samples_loader)
+
+    for _ in tqdm.tqdm(range(20)):
+
+        log_single_sample_debugging_info(
             logger=logger,
             network=network,
             session=session,
@@ -334,7 +487,8 @@ def main():
     # log_default_boxes_matches(logger, config)
 
     # log_ssd_training_loop_data_loader_outputs(logger, config)
-    log_predictions(logger, config)
+    # log_predictions(logger, config)
+    log_debugging_info(logger, config)
 
 
 if __name__ == "__main__":

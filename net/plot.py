@@ -54,7 +54,6 @@ def get_annotated_image(image, annotations, colors, draw_labels=True, font_path=
     for annotation, color in zip(annotations, colors):
 
         box = annotation.bounding_box
-
         cv2.rectangle(annotated_image, (box[0], box[1]), (box[2], box[3]), color=color, thickness=3)
 
     # If we don't need to draw labels, finish processing here
