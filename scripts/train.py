@@ -35,9 +35,15 @@ def get_ssd_training_loop_data_bunch(config):
         voc_samples_data_loader=training_samples_loader,
         ssd_model_configuration=config["vggish_model_configuration"])
 
+    # validation_samples_loader = net.data.VOCSamplesDataLoader(
+    #     data_directory=config["voc"]["data_directory"],
+    #     data_set_path=config["voc"]["validation_set_path"],
+    #     categories=config["categories"],
+    #     size_factor=config["size_factor"])
+
     validation_samples_loader = net.data.VOCSamplesDataLoader(
         data_directory=config["voc"]["data_directory"],
-        data_set_path=config["voc"]["validation_set_path"],
+        data_set_path=config["voc"]["train_set_path"],
         categories=config["categories"],
         size_factor=config["size_factor"])
 

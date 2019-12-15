@@ -256,7 +256,7 @@ class BackgroundDataLoader:
 
 def get_image_augmentation_pipeline():
     """
-    Get image agumentation pipeline
+    Get image augmentation pipeline
     :return: imgaug.augmenters.Augmenter instance
     """
 
@@ -267,6 +267,6 @@ def get_image_augmentation_pipeline():
                 children=[],
                 random_order=True),
             # imgaug.augmenters.Affine(scale=(0.5, 1.2)),
-            # imgaug.augmenters.Affine(rotate=(-15, 15)),
+            imgaug.augmenters.Affine(rotate=(-15, 15)),
             # Left-right flip
             imgaug.augmenters.Fliplr(0.5)])
