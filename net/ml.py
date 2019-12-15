@@ -86,7 +86,7 @@ class VGGishNetwork:
         # For each default box we want to make one hot encoded prediction across categories
         total_filters_count = default_boxes_count * categories_count
 
-        x = tf.keras.layers.Conv2D(filters=128, kernel_size=(3, 3), padding='same', activation=tf.nn.swish)(input_op)
+        x = tf.keras.layers.Conv2D(filters=256, kernel_size=(3, 3), padding='same', activation=tf.nn.swish)(input_op)
         x = tf.keras.layers.Conv2D(filters=total_filters_count, kernel_size=(3, 3), padding='same')(x)
 
         # Reshape prediction to 3D matrix (batch_dimension, default boxes on all pixel locations, categories count)

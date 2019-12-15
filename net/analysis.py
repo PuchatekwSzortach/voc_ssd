@@ -249,4 +249,3 @@ def log_performance_with_annotations_size_analysis(logger, thresholds_matching_d
 
     logger.info(vlogging.VisualRecord(
         "Small unmatched annotations heatmap", small_unmatched_annotations_heatmap_figure))
-

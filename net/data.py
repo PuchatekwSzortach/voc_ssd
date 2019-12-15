@@ -109,7 +109,7 @@ class VOCSamplesDataLoader:
 
     def __init__(
             self, data_directory, data_set_path,
-            categories, size_factor, objects_filtering_config=None, augmentation_pipeline=None):
+            categories, size_factor, augmentation_pipeline=None):
         """
         Constructor
         :param data_directory: path to VOC dataset directory
@@ -118,7 +118,6 @@ class VOCSamplesDataLoader:
         of each label
         :param size_factor: size factor to which images should be rescaled
         data sets
-        :param objects_filtering_config: dictionary, defaults to None. If provided, data loader
         will drop annotations based on filtering options
         :param augmentation_pipeline: imagaug.augmenters.Augmenter instance, optional, if not None, then it's used
         to augment image
@@ -130,8 +129,6 @@ class VOCSamplesDataLoader:
         self.labels_to_categories_index_map = {label: index for (index, label) in enumerate(categories)}
 
         self.size_factor = size_factor
-
-        self.objects_filtering_config = objects_filtering_config
         self.augmentation_pipeline = augmentation_pipeline
 
     def __len__(self):
@@ -162,13 +159,6 @@ class VOCSamplesDataLoader:
                 if self.augmentation_pipeline is not None:
 
                     image, annotations = self._get_augmented_sample(image, annotations)
-
-                if self.objects_filtering_config is not None:
-
-                    # Discard odd sized annotations
-                    annotations = \
-                        [annotation for annotation in annotations
-                         if not net.utilities.is_annotation_size_unusual(annotation, **self.objects_filtering_config)]
 
                 bounding_boxes = [annotation.bounding_box for annotation in annotations]
 
@@ -270,13 +260,13 @@ def get_image_augmentation_pipeline():
     :return: imgaug.augmenters.Augmenter instance
     """
 
-    return imgaug.augmenters.SomeOf(
-        n=(2, 4),
+    return imgaug.augmenters.Sequential(
         children=[
-            # horizontal flips
-            imgaug.augmenters.Fliplr(0.5),
-            # scale, we mostly want to scale down to obtain more smaller objects
-            imgaug.augmenters.Affine(scale=(0.5, 1.2)),
-            imgaug.augmenters.Affine(rotate=(-15, 15))
-        ],
-        random_order=True)
+            imgaug.augmenters.SomeOf(
+                n=(0, 3),
+                children=[],
+                random_order=True),
+            # imgaug.augmenters.Affine(scale=(0.5, 1.2)),
+            # imgaug.augmenters.Affine(rotate=(-15, 15)),
+            # Left-right flip
+            imgaug.augmenters.Fliplr(0.5)])
