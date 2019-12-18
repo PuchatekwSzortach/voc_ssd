@@ -266,7 +266,7 @@ def get_image_augmentation_pipeline():
                 n=(0, 3),
                 children=[],
                 random_order=True),
-            imgaug.augmenters.Affine(scale=(0.8, 1.2)),
+            # imgaug.augmenters.Affine(scale=(0.8, 1.2)),
             # imgaug.augmenters.Affine(rotate=(-15, 15)),
             # Left-right flip
             imgaug.augmenters.Fliplr(0.5)])
