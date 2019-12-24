@@ -158,7 +158,8 @@ class VOCSamplesDataLoader:
 
                 if self.augmentation_pipeline is not None:
 
-                    image, annotations = self._get_augmented_sample(image, annotations)
+                    image, annotations = get_augmented_sample(
+                        image=image, annotations=annotations, augmentation_pipeline=self.augmentation_pipeline)
 
                 bounding_boxes = [annotation.bounding_box for annotation in annotations]
 
@@ -170,29 +171,31 @@ class VOCSamplesDataLoader:
 
                 yield ImageProcessor.get_normalized_image(image), annotations
 
-    def _get_augmented_sample(self, image, annotations):
-        """
-        Augment samples
-        :param image: np.array
-        :param annotations: list of net.utilities.Annotation nstances
-        :return: tuple (image, annotations)
-        """
 
-        bounding_boxes_container = imgaug.augmentables.BoundingBoxesOnImage(
-            bounding_boxes=[imgaug.augmentables.BoundingBox(*annotation.bounding_box) for annotation in annotations],
-            shape=image.shape)
+def get_augmented_sample(image, annotations, augmentation_pipeline):
+    """
+    Augment sample made of image and annotations using augmentation pipeline
+    :param image: 3D numpy array
+    :param annotations: list of net.utilities.Annotation instances
+    :param augmentation_pipeline: imgaug augmenter instance
+    :return: tuple (augmented_image, augmented_annotations)
+    """
 
-        augmented_image, augmented_bounding_boxes_container = self.augmentation_pipeline(
-            image=image,
-            bounding_boxes=bounding_boxes_container)
+    bounding_boxes_container = imgaug.augmentables.BoundingBoxesOnImage(
+        bounding_boxes=[imgaug.augmentables.BoundingBox(*annotation.bounding_box) for annotation in annotations],
+        shape=image.shape)
 
-        augmented_annotations = [net.utilities.Annotation(
-            bounding_box=[bounding_box.x1_int, bounding_box.y1_int, bounding_box.x2_int, bounding_box.y2_int],
-            label=annotation.label,
-            category_id=annotation.category_id
-        ) for (annotation, bounding_box) in zip(annotations, augmented_bounding_boxes_container.bounding_boxes)]
+    augmented_image, augmented_bounding_boxes_container = augmentation_pipeline(
+        image=image,
+        bounding_boxes=bounding_boxes_container)
 
-        return augmented_image, augmented_annotations
+    augmented_annotations = [net.utilities.Annotation(
+        bounding_box=[bounding_box.x1_int, bounding_box.y1_int, bounding_box.x2_int, bounding_box.y2_int],
+        label=annotation.label,
+        category_id=annotation.category_id
+    ) for (annotation, bounding_box) in zip(annotations, augmented_bounding_boxes_container.bounding_boxes)]
+
+    return augmented_image, augmented_annotations
 
 
 class BackgroundDataLoader:
@@ -263,10 +266,10 @@ def get_image_augmentation_pipeline():
     return imgaug.augmenters.Sequential(
         children=[
             imgaug.augmenters.SomeOf(
-                n=(0, 3),
-                children=[],
+                n=(0, None),
+                children=[
+                    imgaug.augmenters.Grayscale(alpha=(0.2, 1))
+                ],
                 random_order=True),
-            # imgaug.augmenters.Affine(scale=(0.8, 1.2)),
-            # imgaug.augmenters.Affine(rotate=(-15, 15)),
             # Left-right flip
             imgaug.augmenters.Fliplr(0.5)])
