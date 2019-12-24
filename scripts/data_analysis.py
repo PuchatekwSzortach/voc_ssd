@@ -49,7 +49,7 @@ def analyze_images_sizes(config):
 def get_filtered_dataset_annotations(config):
     """
     Retrieves annotations for the dataset, scales them in accordance to how their images would be scaled
-    in prediction, filters ount unusually sized annotations, then returns annotations that made it through filtering
+    in prediction, filters out unusually sized annotations, then returns annotations that made it through filtering
     :param config: configuration dictionary
     :return: list of net.utilities.Annotation instances
     """

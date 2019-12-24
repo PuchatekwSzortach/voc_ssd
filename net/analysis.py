@@ -3,6 +3,8 @@ Script with analysis code
 """
 
 import collections
+import queue
+import threading
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -63,6 +65,10 @@ class MatchingDataComputer:
         self.thresholds = thresholds
         self.categories = categories
 
+        self._matching_computations_inputs_queue = queue.Queue(maxsize=100)
+        self._matching_computations_thread = None
+        self._continue_processing_matches = None
+
     def get_thresholds_matched_data_map(self):
         """
         Runs predictions over all samples from samples model and returns matches data for each threshold.
@@ -75,12 +81,39 @@ class MatchingDataComputer:
 
         thresholds_matched_data_map = {threshold: collections.defaultdict(list) for threshold in self.thresholds}
 
+        self._continue_processing_matches = True
+
+        self._matching_computations_thread = threading.Thread(
+            target=self._matching_computations,
+            args=(thresholds_matched_data_map, self._matching_computations_inputs_queue))
+
+        self._matching_computations_thread.start()
+
         for _ in tqdm.tqdm(range(len(self.samples_loader))):
 
             image, ground_truth_annotations = next(iterator)
 
-            default_boxes_matrix = self.default_boxes_factory.get_default_boxes_matrix(image.shape)
             softmax_predictions_matrix = self.model.predict(image)
+
+            # Put data on a queue, matching computations thread will process that data and put results into
+            # thresholds_matched_data_map
+            self._matching_computations_inputs_queue.put(
+                (image.shape, ground_truth_annotations, softmax_predictions_matrix))
+
+        self._continue_processing_matches = False
+        self._matching_computations_inputs_queue.join()
+        self._matching_computations_thread.join()
+
+        return thresholds_matched_data_map
+
+    def _matching_computations(self, thresholds_matched_data_map, predictions_queue):
+
+        while self._continue_processing_matches is True or self._matching_computations_inputs_queue.empty() is False:
+
+            image_shape, ground_truth_annotations, softmax_predictions_matrix = predictions_queue.get()
+            predictions_queue.task_done()
+
+            default_boxes_matrix = self.default_boxes_factory.get_default_boxes_matrix(image_shape)
 
             for threshold in self.thresholds:
 
@@ -113,8 +146,6 @@ class MatchingDataComputer:
                     else:
 
                         matches_data["unmatched_predictions"].append(prediction)
-
-        return thresholds_matched_data_map
 
 
 def get_precision_recall_analysis_report(
@@ -249,3 +280,18 @@ def log_performance_with_annotations_size_analysis(logger, thresholds_matching_d
 
     logger.info(vlogging.VisualRecord(
         "Small unmatched annotations heatmap", small_unmatched_annotations_heatmap_figure))
+
+    def large_size_filter(annotation):
+
+        return annotation.width > 100 and annotation.height > 100
+
+    large_unmatched_annotations = \
+        [annotation for annotation in unmatched_annotations if large_size_filter(annotation) is True]
+
+    large_unmatched_annotations_analysis = net.utilities.get_objects_sizes_analysis(
+        large_unmatched_annotations, size_factor=20)
+
+    large_unmatched_annotations_analysis_message = "<br>".join([
+        "{} -> {}".format(count, size) for count, size in large_unmatched_annotations_analysis])
+
+    logger.info("<h3>Large unmatched annotations count:</h3> <br>" + large_unmatched_annotations_analysis_message)
