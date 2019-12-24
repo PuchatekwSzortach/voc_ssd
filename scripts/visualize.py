@@ -466,6 +466,46 @@ def log_debugging_info(logger, config):
             config=config)
 
 
+def log_augmentations(logger, config):
+    """
+    Log augmentations
+    :param logger: logger instance
+    :param config: dictionary with configuration options
+    """
+
+    validation_samples_loader = net.data.VOCSamplesDataLoader(
+        data_directory=config["voc"]["data_directory"],
+        data_set_path=config["voc"]["train_set_path"],
+        categories=config["categories"],
+        size_factor=config["size_factor"])
+
+    augmentation_pipeline = net.data.get_image_augmentation_pipeline()
+
+    iterator = iter(validation_samples_loader)
+
+    for _ in tqdm.tqdm(range(10)):
+
+        image, annotations = next(iterator)
+        image = net.data.ImageProcessor.get_denormalized_image(image)
+
+        annotated_image = net.plot.get_annotated_image(
+            image=image,
+            annotations=annotations,
+            colors=[(255, 0, 0)] * len(annotations),
+            draw_labels=False)
+
+        augmented_image, augmented_annotations = net.data.get_augmented_sample(
+            image=image, annotations=annotations, augmentation_pipeline=augmentation_pipeline)
+
+        augmented_annotated_image = net.plot.get_annotated_image(
+            image=augmented_image,
+            annotations=augmented_annotations,
+            colors=[(255, 0, 0)] * len(augmented_annotations),
+            draw_labels=False)
+
+        logger.info(vlogging.VisualRecord("sample", [annotated_image, augmented_annotated_image]))
+
+
 def main():
     """
     Script entry point
@@ -487,8 +527,9 @@ def main():
     # log_default_boxes_matches(logger, config)
 
     # log_ssd_training_loop_data_loader_outputs(logger, config)
-    log_predictions(logger, config)
+    # log_predictions(logger, config)
     # log_debugging_info(logger, config)
+    log_augmentations(logger, config)
 
 
 if __name__ == "__main__":
