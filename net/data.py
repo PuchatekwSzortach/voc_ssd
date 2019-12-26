@@ -211,7 +211,7 @@ class BackgroundDataLoader:
 
         self.data_loader = data_loader
 
-        self._samples_queue = queue.Queue(maxsize=100)
+        self._samples_queue = queue.Queue(maxsize=400)
         self._samples_generation_thread = None
         self._continue_generating_samples = None
 

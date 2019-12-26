@@ -65,9 +65,11 @@ class MatchingDataComputer:
         self.thresholds = thresholds
         self.categories = categories
 
-        self._matching_computations_inputs_queue = queue.Queue(maxsize=100)
-        self._matching_computations_thread = None
-        self._continue_processing_matches = None
+        self._matching_computations_properties = {
+            "continue_processing_matches_flag": None,
+            "computations_thread": None,
+            "queue": queue.Queue(maxsize=400)
+        }
 
     def get_thresholds_matched_data_map(self):
         """
@@ -81,13 +83,13 @@ class MatchingDataComputer:
 
         thresholds_matched_data_map = {threshold: collections.defaultdict(list) for threshold in self.thresholds}
 
-        self._continue_processing_matches = True
+        self._matching_computations_properties["continue_processing_matches_flag"] = True
 
-        self._matching_computations_thread = threading.Thread(
+        self._matching_computations_properties["computations_thread"] = threading.Thread(
             target=self._matching_computations,
-            args=(thresholds_matched_data_map, self._matching_computations_inputs_queue))
+            args=(thresholds_matched_data_map, self._matching_computations_properties["queue"]))
 
-        self._matching_computations_thread.start()
+        self._matching_computations_properties["computations_thread"].start()
 
         for _ in tqdm.tqdm(range(len(self.samples_loader))):
 
@@ -97,18 +99,20 @@ class MatchingDataComputer:
 
             # Put data on a queue, matching computations thread will process that data and put results into
             # thresholds_matched_data_map
-            self._matching_computations_inputs_queue.put(
+            self._matching_computations_properties["queue"].put(
                 (image.shape, ground_truth_annotations, softmax_predictions_matrix))
 
-        self._continue_processing_matches = False
-        self._matching_computations_inputs_queue.join()
-        self._matching_computations_thread.join()
+        self._matching_computations_properties["continue_processing_matches_flag"] = False
+        self._matching_computations_properties["queue"].join()
+        self._matching_computations_properties["computations_thread"].join()
 
         return thresholds_matched_data_map
 
     def _matching_computations(self, thresholds_matched_data_map, predictions_queue):
 
-        while self._continue_processing_matches is True or self._matching_computations_inputs_queue.empty() is False:
+        while \
+                self._matching_computations_properties["continue_processing_matches_flag"] is True or \
+                predictions_queue.empty() is False:
 
             image_shape, ground_truth_annotations, softmax_predictions_matrix = predictions_queue.get()
             predictions_queue.task_done()
@@ -254,6 +258,43 @@ def get_annotations_sizes_heatmap_figure(annotations, bin_size, max_size):
     return figure
 
 
+def log_unmatched_annotations_sizes(
+        logger, unmatched_annotations, x_range, y_range, size_factor, instances_threshold):
+    """
+    Log statistics about unmatched annotations sizes within specified x and y ranges, binned by specified size_factor.
+    Only objects missed more than instances threshold are reported
+    :param logger: logger instance
+    :param unmatched_annotations: list of net.utilities.Annotation instances,
+    :param x_range: tuple of ints (min_x_size, max_x_size), lower value is inclusive
+    :param y_range: tuple of ints (min_y_size, max_y_size), lower value is inclusive
+    :param size_factor: int, size factor within which objects are binned together
+    :param instances_threshold: int, threshold above which missed object count for given size must be for that
+    size to be reported
+    """
+
+    def is_annotation_within_target_size(annotation):
+        return x_range[0] <= annotation.width < x_range[1] and y_range[0] <= annotation.height < y_range[1]
+
+    unmatched_annotations_within_target_size = \
+        [annotation for annotation in unmatched_annotations if is_annotation_within_target_size(annotation) is True]
+
+    misses_counts_sizes_tuples = net.utilities.get_objects_sizes_analysis(
+        unmatched_annotations_within_target_size, size_factor=size_factor)
+
+    thresholded_counts_sizes_tuples = \
+        [element for element in misses_counts_sizes_tuples if element[0] > instances_threshold]
+
+    large_unmatched_annotations_analysis_message = "<br>".join([
+        "{} -> {}".format(count, size) for count, size in thresholded_counts_sizes_tuples])
+
+    header_template = (
+        "<h3>Unmatched annotations in y range {} and x range {}, binned by size factor {} "
+        "and thresholded above {}:</h3>"
+    ).format(y_range, x_range, size_factor, instances_threshold)
+
+    logger.info(header_template + large_unmatched_annotations_analysis_message)
+
+
 def log_performance_with_annotations_size_analysis(logger, thresholds_matching_data_map):
     """
     Log performance of network across annotations of different sizes
@@ -281,17 +322,26 @@ def log_performance_with_annotations_size_analysis(logger, thresholds_matching_d
     logger.info(vlogging.VisualRecord(
         "Small unmatched annotations heatmap", small_unmatched_annotations_heatmap_figure))
 
-    def large_size_filter(annotation):
+    log_unmatched_annotations_sizes(
+        logger=logger,
+        unmatched_annotations=unmatched_annotations,
+        x_range=(100, 600),
+        y_range=(100, 600),
+        size_factor=20,
+        instances_threshold=10)
 
-        return annotation.width > 100 and annotation.height > 100
+    log_unmatched_annotations_sizes(
+        logger=logger,
+        unmatched_annotations=unmatched_annotations,
+        x_range=(40, 200),
+        y_range=(40, 200),
+        size_factor=10,
+        instances_threshold=10)
 
-    large_unmatched_annotations = \
-        [annotation for annotation in unmatched_annotations if large_size_filter(annotation) is True]
-
-    large_unmatched_annotations_analysis = net.utilities.get_objects_sizes_analysis(
-        large_unmatched_annotations, size_factor=20)
-
-    large_unmatched_annotations_analysis_message = "<br>".join([
-        "{} -> {}".format(count, size) for count, size in large_unmatched_annotations_analysis])
-
-    logger.info("<h3>Large unmatched annotations count:</h3> <br>" + large_unmatched_annotations_analysis_message)
+    log_unmatched_annotations_sizes(
+        logger=logger,
+        unmatched_annotations=unmatched_annotations,
+        x_range=(10, 100),
+        y_range=(10, 100),
+        size_factor=5,
+        instances_threshold=10)

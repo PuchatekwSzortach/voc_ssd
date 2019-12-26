@@ -527,9 +527,9 @@ def main():
     # log_default_boxes_matches(logger, config)
 
     # log_ssd_training_loop_data_loader_outputs(logger, config)
-    # log_predictions(logger, config)
+    log_predictions(logger, config)
     # log_debugging_info(logger, config)
-    log_augmentations(logger, config)
+    # log_augmentations(logger, config)
 
 
 if __name__ == "__main__":
