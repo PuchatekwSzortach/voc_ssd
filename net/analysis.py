@@ -65,12 +65,6 @@ class MatchingDataComputer:
         self.thresholds = thresholds
         self.categories = categories
 
-        self._matching_computations_properties = {
-            "continue_processing_matches_flag": None,
-            "computations_thread": None,
-            "queue": queue.Queue(maxsize=400)
-        }
-
     def get_thresholds_matched_data_map(self):
         """
         Runs predictions over all samples from samples model and returns matches data for each threshold.
@@ -83,39 +77,35 @@ class MatchingDataComputer:
 
         thresholds_matched_data_map = {threshold: collections.defaultdict(list) for threshold in self.thresholds}
 
-        self._matching_computations_properties["continue_processing_matches_flag"] = True
+        samples_count = len(self.samples_loader)
+        samples_queue = queue.Queue(maxsize=250)
 
-        self._matching_computations_properties["computations_thread"] = threading.Thread(
+        computations_thread = threading.Thread(
             target=self._matching_computations,
-            args=(thresholds_matched_data_map, self._matching_computations_properties["queue"]))
+            args=(thresholds_matched_data_map, samples_queue, samples_count))
 
-        self._matching_computations_properties["computations_thread"].start()
+        computations_thread.start()
 
-        for _ in tqdm.tqdm(range(len(self.samples_loader))):
+        for _ in range(samples_count):
 
             image, ground_truth_annotations = next(iterator)
-
             softmax_predictions_matrix = self.model.predict(image)
 
             # Put data on a queue, matching computations thread will process that data and put results into
             # thresholds_matched_data_map
-            self._matching_computations_properties["queue"].put(
-                (image.shape, ground_truth_annotations, softmax_predictions_matrix))
+            samples_queue.put((image.shape, ground_truth_annotations, softmax_predictions_matrix))
 
-        self._matching_computations_properties["continue_processing_matches_flag"] = False
-        self._matching_computations_properties["queue"].join()
-        self._matching_computations_properties["computations_thread"].join()
+        samples_queue.join()
+        computations_thread.join()
 
         return thresholds_matched_data_map
 
-    def _matching_computations(self, thresholds_matched_data_map, predictions_queue):
+    def _matching_computations(self, thresholds_matched_data_map, samples_queue, samples_count):
 
-        while \
-                self._matching_computations_properties["continue_processing_matches_flag"] is True or \
-                predictions_queue.empty() is False:
+        for _ in tqdm.tqdm(range(samples_count)):
 
-            image_shape, ground_truth_annotations, softmax_predictions_matrix = predictions_queue.get()
-            predictions_queue.task_done()
+            image_shape, ground_truth_annotations, softmax_predictions_matrix = samples_queue.get()
+            samples_queue.task_done()
 
             default_boxes_matrix = self.default_boxes_factory.get_default_boxes_matrix(image_shape)
 

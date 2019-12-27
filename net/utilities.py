@@ -476,3 +476,62 @@ def analyze_annotations(annotations):
 
     print("Above large size ratio: {}".format(sum(annotations_over_large_size) / len(annotations)))
     print("Below small size ratio: {}".format(sum(annotations_below_small_size) / len(annotations)))
+
+
+def get_detections_after_soft_non_maximum_suppression(detections, sigma=0.5, score_threshold=0.001):
+    """
+    Soft non-maximum suppression algorithm.
+    Implementation adapted from https://github.com/OneDirection9/soft-nms
+    Args:
+        detections (numpy.array): Detection results with shape `(num, 5)`,
+            data in second dimension are [x_min, y_min, x_max, y_max, score] respectively.
+        sigma (float): Gaussian function parameter. Only work when method
+            is `gaussian`.
+        score_threshold (float): Boxes with score below this value will be discarded
+    Returns:
+        numpy.array: Retained boxes.
+    .. _`Improving Object Detection With One Line of Code`:
+        https://arxiv.org/abs/1704.04503
+    """
+
+    areas = (detections[:, 2] - detections[:, 0] + 1) * (detections[:, 3] - detections[:, 1] + 1)
+    # expand detections with areas, so that the second dimension is
+    # x_min, y_min, x_max, y_max, score, area
+    detections = np.concatenate([detections, areas.reshape(-1, 1)], axis=1)
+
+    retained_detections = []
+
+    while detections.size > 0:
+
+        # Get index for detection with max score, then swap that detection with detection at index 0.
+        # This way we will get detection with max score at index 0 in detections array
+        max_score_index = np.argmax(detections[:, 4], axis=0)
+        detections[[0, max_score_index]] = detections[[max_score_index, 0]]
+
+        # Save max score detection to retained detections
+        retained_detections.append(detections[0])
+
+        # Compute intersection over union between top score box and all other boxes
+        min_x = np.maximum(detections[0, 0], detections[1:, 0])
+        min_y = np.maximum(detections[0, 1], detections[1:, 1])
+        max_x = np.minimum(detections[0, 2], detections[1:, 2])
+        max_y = np.minimum(detections[0, 3], detections[1:, 3])
+
+        overlap_width = np.maximum(max_x - min_x + 1, 0.0)
+        overlap_height = np.maximum(max_y - min_y + 1, 0.0)
+
+        intersection_area = overlap_width * overlap_height
+        intersection_over_union = intersection_area / (detections[0, 5] + detections[1:, 5] - intersection_area)
+
+        # Update detections scores for all detections other than max score - we don't want to affect its score.
+        # Scores are updated using an exponential function such that detections that have no intersection with top
+        # score detection aren't affected, and boxes that have iou of 1 with top score detection have their
+        # scores set to zero
+        detections[1:, 4] *= np.exp(-(intersection_over_union * intersection_over_union) / sigma)
+
+        # Discard detections with scores below score threshold. Take care to shift indices by +1 to account for fact
+        # we are leaving out top score detection at index 0
+        retained_detections_indices = np.where(detections[1:, 4] >= score_threshold)[0] + 1
+        detections = detections[retained_detections_indices]
+
+    return np.array(retained_detections)

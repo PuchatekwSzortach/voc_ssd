@@ -4,7 +4,7 @@ import invoke
 @invoke.task
 def unit_tests(context):
 
-    context.run("pytest", pty=True)
+    context.run("pytest ./tests", pty=True)
 
 
 @invoke.task

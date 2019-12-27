@@ -440,3 +440,25 @@ def test_default_box_definition_get_overlaps_analysis_with_different_box():
     actual = default_box_definition.get_overlaps(other)
 
     assert expected == actual
+
+
+def test_get_detections_after_soft_non_maximum_suppression_two_highly_overlapping_boxes_one_should_be_discarded():
+    """
+    Test our soft-nms implementation is correct on a very simple case with two highly overlapping boxes
+    """
+
+    np.set_printoptions(suppress=True)
+
+    detections = np.array([
+        [82, 82, 95, 95, 0.6],
+        [80, 80, 100, 100, 0.9]
+    ])
+
+    expected = np.array([
+        [80, 80, 100, 100, 0.9]
+    ])
+
+    actual = net.utilities.get_detections_after_soft_non_maximum_suppression(
+        detections=detections, sigma=0.5, score_threshold=0.5)[:, :5]
+
+    assert np.all(expected == actual)
