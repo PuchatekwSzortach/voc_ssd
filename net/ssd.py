@@ -205,38 +205,99 @@ class SSDTrainingLoopDataLoader:
             yield image, default_boxes_categories_ids_vector
 
 
-def get_predicted_annotations(default_boxes_matrix, softmax_predictions_matrix, categories, threshold):
+class PredictedAnnotationsComputer:
     """
-    Get list of predicted annotations based on default boxes matrix and softmax predictions matrix, using
-    predictions above given threshold
-    :param default_boxes_matrix: 2D numpy array, each row represents coordinates of a default bounding box
-    :param softmax_predictions_matrix: 2D numpy array, each row represents one-hot encoded softmax predictions
-    for a corresponding default box
-    :param categories: list of strings
-    :param threshold: float, only non-background predictions above this threshold will be returned
-    :return: list of net.data.Annotation instances
+    Class for computing predicted annotations from predictions matrix and default boxes matrix
     """
 
-    # Get a selector for non-background predictions over threshold
-    predictions_selector = \
-        (np.argmax(softmax_predictions_matrix, axis=1) > 0) & \
-        (np.max(softmax_predictions_matrix, axis=1) > threshold)
+    def __init__(self, categories, threshold, use_non_maximum_suppression):
+        """
+        Constructor
+        :param categories: list of strings
+        :param threshold: float, only non-background predictions above this threshold will be returned
+        :param use_non_maximum_suppression: bool, specifies if non maximum suppression should be used.
+        soft-nms algorithm is used for non maximum suppression.
+        """
 
-    predictions_boxes = default_boxes_matrix[predictions_selector]
-    predictions_categories_indices = np.argmax(softmax_predictions_matrix[predictions_selector], axis=1)
+        self.categories = categories
+        self.threshold = threshold
+        self.use_non_maximum_suppression = use_non_maximum_suppression
 
-    annotations = []
+    def get_predicted_annotations(self, default_boxes_matrix, softmax_predictions_matrix):
+        """
+        Get list of predicted annotations based on default boxes matrix and softmax predictions matrix
+        :param default_boxes_matrix: 2D numpy array, each row represents coordinates of a default bounding box
+        :param softmax_predictions_matrix: 2D numpy array, each row represents one-hot encoded softmax predictions
+        for a corresponding default box
+        :return: list of net.utilities.Annotation instances
+        """
 
-    for box, category_id in zip(predictions_boxes, predictions_categories_indices):
+        if self.use_non_maximum_suppression is True:
 
-        annotation = net.utilities.Annotation(
-            bounding_box=[int(x) for x in box],
-            label=categories[category_id],
-            category_id=category_id)
+            return self._get_soft_nms_predicted_annotations(default_boxes_matrix, softmax_predictions_matrix)
 
-        annotations.append(annotation)
+        else:
 
-    return annotations
+            return self._get_raw_predicted_annotations(default_boxes_matrix, softmax_predictions_matrix)
+
+    def _get_raw_predicted_annotations(self, default_boxes_matrix, softmax_predictions_matrix):
+
+        # Get a selector for non-background predictions over threshold
+        predictions_selector = \
+            (np.argmax(softmax_predictions_matrix, axis=1) > 0) & \
+            (np.max(softmax_predictions_matrix, axis=1) > self.threshold)
+
+        predictions_boxes = default_boxes_matrix[predictions_selector]
+        predictions_categories_indices = np.argmax(softmax_predictions_matrix[predictions_selector], axis=1)
+
+        annotations = []
+
+        for box, category_id in zip(predictions_boxes, predictions_categories_indices):
+            annotation = net.utilities.Annotation(
+                bounding_box=[int(x) for x in box],
+                label=self.categories[category_id],
+                category_id=category_id)
+
+            annotations.append(annotation)
+
+        return annotations
+
+    def _get_soft_nms_predicted_annotations(self, default_boxes_matrix, softmax_predictions_matrix):
+
+        # Get a selector for non-background predictions over threshold
+        predictions_selector = \
+            (np.argmax(softmax_predictions_matrix, axis=1) > 0) & \
+            (np.max(softmax_predictions_matrix, axis=1) > self.threshold)
+
+        predictions_boxes = default_boxes_matrix[predictions_selector]
+        predictions_categories_indices = np.argmax(softmax_predictions_matrix[predictions_selector], axis=1)
+
+        annotations = []
+
+        # Get predictions scores as a column vector
+        predictions_scores = np.max(softmax_predictions_matrix[predictions_selector], axis=1).reshape(-1, 1)
+
+        # Merge predictions boxes and scores together into detections matrix
+        detections = np.concatenate([predictions_boxes, predictions_scores], axis=1)
+
+        # soft nms works on each category separately
+        for category_id in range(1, len(self.categories)):
+
+            # Perform soft-nms on detections for current category
+            retained_detections_at_current_category = net.utilities.get_detections_after_soft_non_maximum_suppression(
+                detections=detections[predictions_categories_indices == category_id],
+                sigma=0.5,
+                score_threshold=self.threshold)
+
+            for detection in retained_detections_at_current_category:
+                annotation = net.utilities.Annotation(
+                    bounding_box=[int(x) for x in detection[:4]],
+                    label=self.categories[category_id],
+                    category_id=category_id)
+
+                annotations.append(annotation)
+
+        return annotations
 
 
 def get_single_shot_detector_loss_op(

@@ -113,11 +113,12 @@ class MatchingDataComputer:
 
                 matches_data = thresholds_matched_data_map[threshold]
 
-                predicted_annotations = net.ssd.get_predicted_annotations(
-                    default_boxes_matrix=default_boxes_matrix,
-                    softmax_predictions_matrix=softmax_predictions_matrix,
+                predicted_annotations = net.ssd.PredictedAnnotationsComputer(
                     categories=self.categories,
-                    threshold=threshold)
+                    threshold=threshold,
+                    use_non_maximum_suppression=False).get_predicted_annotations(
+                        default_boxes_matrix=default_boxes_matrix,
+                        softmax_predictions_matrix=softmax_predictions_matrix)
 
                 # For each ground truth annotation, check if it was matched by any prediction
                 for ground_truth_annotation in ground_truth_annotations:
