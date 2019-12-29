@@ -478,7 +478,7 @@ def analyze_annotations(annotations):
     print("Below small size ratio: {}".format(sum(annotations_below_small_size) / len(annotations)))
 
 
-def get_detections_after_soft_non_maximum_suppression(detections, sigma=0.5, score_threshold=0.001):
+def get_detections_after_soft_non_maximum_suppression(detections, sigma, score_threshold):
     """
     Soft non-maximum suppression algorithm.
     Implementation adapted from https://github.com/OneDirection9/soft-nms

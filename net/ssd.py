@@ -287,7 +287,7 @@ class PredictedAnnotationsComputer:
             retained_detections_at_current_category = net.utilities.get_detections_after_soft_non_maximum_suppression(
                 detections=detections[predictions_categories_indices == category_id],
                 sigma=0.5,
-                score_threshold=self.threshold)
+                score_threshold=0.7)
 
             for detection in retained_detections_at_current_category:
                 annotation = net.utilities.Annotation(
