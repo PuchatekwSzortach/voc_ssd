@@ -205,9 +205,9 @@ class SSDTrainingLoopDataLoader:
             yield image, default_boxes_categories_ids_vector
 
 
-class PredictedAnnotationsComputer:
+class PredictionsComputer:
     """
-    Class for computing predicted annotations from predictions matrix and default boxes matrix
+    Class for computing objects predictions from predictions matrix and default boxes matrix
     """
 
     def __init__(self, categories, threshold, use_non_maximum_suppression):
@@ -223,24 +223,24 @@ class PredictedAnnotationsComputer:
         self.threshold = threshold
         self.use_non_maximum_suppression = use_non_maximum_suppression
 
-    def get_predicted_annotations(self, default_boxes_matrix, softmax_predictions_matrix):
+    def get_predictions(self, default_boxes_matrix, softmax_predictions_matrix):
         """
         Get list of predicted annotations based on default boxes matrix and softmax predictions matrix
         :param default_boxes_matrix: 2D numpy array, each row represents coordinates of a default bounding box
         :param softmax_predictions_matrix: 2D numpy array, each row represents one-hot encoded softmax predictions
         for a corresponding default box
-        :return: list of net.utilities.Annotation instances
+        :return: list of net.utilities.Prediction instances
         """
 
         if self.use_non_maximum_suppression is True:
 
-            return self._get_soft_nms_predicted_annotations(default_boxes_matrix, softmax_predictions_matrix)
+            return self._get_soft_nms_predictions(default_boxes_matrix, softmax_predictions_matrix)
 
         else:
 
-            return self._get_raw_predicted_annotations(default_boxes_matrix, softmax_predictions_matrix)
+            return self._get_raw_predictions(default_boxes_matrix, softmax_predictions_matrix)
 
-    def _get_raw_predicted_annotations(self, default_boxes_matrix, softmax_predictions_matrix):
+    def _get_raw_predictions(self, default_boxes_matrix, softmax_predictions_matrix):
 
         # Get a selector for non-background predictions over threshold
         predictions_selector = \
@@ -249,20 +249,24 @@ class PredictedAnnotationsComputer:
 
         predictions_boxes = default_boxes_matrix[predictions_selector]
         predictions_categories_indices = np.argmax(softmax_predictions_matrix[predictions_selector], axis=1)
+        predictions_confidences = np.max(softmax_predictions_matrix[predictions_selector], axis=1)
 
-        annotations = []
+        predictions = []
 
-        for box, category_id in zip(predictions_boxes, predictions_categories_indices):
-            annotation = net.utilities.Annotation(
+        for box, category_id, confidence in \
+                zip(predictions_boxes, predictions_categories_indices, predictions_confidences):
+
+            prediction = net.utilities.Prediction(
                 bounding_box=[int(x) for x in box],
+                confidence=confidence,
                 label=self.categories[category_id],
                 category_id=category_id)
 
-            annotations.append(annotation)
+            predictions.append(prediction)
 
-        return annotations
+        return predictions
 
-    def _get_soft_nms_predicted_annotations(self, default_boxes_matrix, softmax_predictions_matrix):
+    def _get_soft_nms_predictions(self, default_boxes_matrix, softmax_predictions_matrix):
 
         # Get a selector for non-background predictions over threshold
         predictions_selector = \
@@ -272,7 +276,7 @@ class PredictedAnnotationsComputer:
         predictions_boxes = default_boxes_matrix[predictions_selector]
         predictions_categories_indices = np.argmax(softmax_predictions_matrix[predictions_selector], axis=1)
 
-        annotations = []
+        predictions = []
 
         # Get predictions scores as a column vector
         predictions_scores = np.max(softmax_predictions_matrix[predictions_selector], axis=1).reshape(-1, 1)
@@ -290,14 +294,16 @@ class PredictedAnnotationsComputer:
                 score_threshold=0.7)
 
             for detection in retained_detections_at_current_category:
-                annotation = net.utilities.Annotation(
+
+                prediction = net.utilities.Prediction(
                     bounding_box=[int(x) for x in detection[:4]],
+                    confidence=detection[4],
                     label=self.categories[category_id],
                     category_id=category_id)
 
-                annotations.append(annotation)
+                predictions.append(prediction)
 
-        return annotations
+        return predictions
 
 
 def get_single_shot_detector_loss_op(

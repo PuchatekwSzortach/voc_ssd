@@ -83,6 +83,17 @@ class Annotation:
         return "Annotation: {}, {}".format(self.label, self.bounding_box)
 
 
+class Prediction(Annotation):
+    """
+    Class for wrapping up bounding box, category and confidence of a prediction
+    """
+
+    def __init__(self, bounding_box, confidence, label=None, category_id=None):
+
+        super().__init__(bounding_box, label, category_id)
+        self.confidence = confidence
+
+
 class DefaultBoxDefinition:
     """
     Class holding definition of a default bounding box - its width, height and step to next box.

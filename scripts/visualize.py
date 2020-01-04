@@ -290,30 +290,30 @@ def log_single_prediction(logger, network, session, default_boxes_factory, sampl
     default_boxes_matrix = default_boxes_factory.get_default_boxes_matrix(image.shape)
 
     # Get annotations boxes and labels from predictions matrix and default boxes matrix
-    predicted_annotations = net.ssd.PredictedAnnotationsComputer(
+    predictions = net.ssd.PredictionsComputer(
         categories=config["categories"],
         threshold=0.5,
-        use_non_maximum_suppression=False).get_predicted_annotations(
+        use_non_maximum_suppression=False).get_predictions(
             default_boxes_matrix=default_boxes_matrix,
             softmax_predictions_matrix=softmax_predictions_matrix)
 
-    predicted_annotations_with_nms = net.ssd.PredictedAnnotationsComputer(
+    predictions_with_nms = net.ssd.PredictionsComputer(
         categories=config["categories"],
         threshold=0.5,
-        use_non_maximum_suppression=True).get_predicted_annotations(
+        use_non_maximum_suppression=True).get_predictions(
             default_boxes_matrix=default_boxes_matrix,
             softmax_predictions_matrix=softmax_predictions_matrix)
 
     predicted_annotations_image = net.plot.get_annotated_image(
         image=net.data.ImageProcessor.get_denormalized_image(image),
-        annotations=predicted_annotations,
-        colors=[(0, 255, 0)] * len(predicted_annotations),
+        annotations=predictions,
+        colors=[(0, 255, 0)] * len(predictions),
         font_path=config["font_path"])
 
     predicted_annotations_image_with_nms = net.plot.get_annotated_image(
         image=net.data.ImageProcessor.get_denormalized_image(image),
-        annotations=predicted_annotations_with_nms,
-        colors=[(0, 255, 0)] * len(predicted_annotations_with_nms),
+        annotations=predictions_with_nms,
+        colors=[(0, 255, 0)] * len(predictions_with_nms),
         font_path=config["font_path"])
 
     logger.info(vlogging.VisualRecord(
@@ -429,10 +429,10 @@ def log_single_sample_debugging_info(
         feed_dict={network.input_placeholder: np.array([image])})[0]
 
     # Get annotations boxes and labels from predictions matrix and default boxes matrix
-    predicted_annotations = net.ssd.PredictedAnnotationsComputer(
+    predictions = net.ssd.PredictionsComputer(
         categories=config["categories"],
         threshold=0.5,
-        use_non_maximum_suppression=False).get_predicted_annotations(
+        use_non_maximum_suppression=False).get_predictions(
             default_boxes_matrix=default_boxes_matrix,
             softmax_predictions_matrix=softmax_predictions_matrix)
 
@@ -440,7 +440,7 @@ def log_single_sample_debugging_info(
         image=net.data.ImageProcessor.get_denormalized_image(image),
         ground_truth_annotations=ground_truth_annotations,
         matched_default_boxes=matched_default_boxes,
-        predicted_annotations=predicted_annotations,
+        predicted_annotations=predictions,
         config=config)
 
     logger.info(record)
