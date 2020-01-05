@@ -71,6 +71,10 @@ def main():
         logger=logger,
         thresholds_matching_data_map=thresholds_matching_data_map)
 
+    net.analysis.log_mean_average_precision_analysis(
+        logger=logger,
+        thresholds_matching_data_map=thresholds_matching_data_map)
+
     net.analysis.log_performance_with_annotations_size_analysis(
         logger=logger,
         thresholds_matching_data_map=thresholds_matching_data_map)

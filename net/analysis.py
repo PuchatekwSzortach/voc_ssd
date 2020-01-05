@@ -415,3 +415,82 @@ def get_predictions_matches(ground_truth_annotations, predictions):
             )
 
     return matches_data
+
+
+def log_mean_average_precision_analysis(logger, thresholds_matching_data_map):
+    """
+    Log VOC Pascal 2007 style mean average precision for predictions across different thresholds
+    :param logger: logger instance
+    :param thresholds_matching_data_map: dictionary, each key is a float and value is a dictionary with
+    info about predictions matches
+    """
+
+    for threshold in sorted(thresholds_matching_data_map.keys()):
+
+        logger.info("At threshold {}<br>".format(threshold))
+
+        matching_data = thresholds_matching_data_map[threshold]
+
+        ground_truth_annotations_count = \
+            len(matching_data["matched_annotations"]) + len(matching_data["unmatched_annotations"])
+
+        mean_average_precision = MeanAveragePrecisionComputer.get_mean_average_precision(
+            predictions_matches_data=matching_data["mean_average_precision_data"],
+            ground_truth_annotations_count=ground_truth_annotations_count)
+
+        logger.info("Mean average precision is: {:.4f}".format(mean_average_precision))
+        logger.info("<br>")
+
+
+class MeanAveragePrecisionComputer:
+    """
+    Class for computing VOC Pascal 2007 style mean average precision
+    """
+
+    @staticmethod
+    def get_recall_values_and_precision_values_data(predictions_matches_data, ground_truth_annotations_count):
+        """
+        Given predictions matches data return recall values and precision values computed up to each prediction
+        matches data element
+        :param predictions_matches_data: list of dictionaries with prediction and information whether is matched
+        a ground truth annotation
+        :param ground_truth_annotations_count: int, number of ground truth annotations in dataset
+        :return: tuple of two lists, first contains recall values across predictions matches data,
+        second contains precision values across predictions matches data
+        """
+
+        sorted_predictions_matches_data = sorted(
+            predictions_matches_data, key=lambda x: x["prediction"].confidence, reverse=True)
+
+        matched_ground_truth_annotations_count = 0
+        recall_values = []
+
+        predictions_correctness_values = []
+        precision_values = []
+
+        for prediction_match_data in sorted_predictions_matches_data:
+
+            matched_ground_truth_annotations_count += int(prediction_match_data["is_correct"])
+            recall_values.append(matched_ground_truth_annotations_count / ground_truth_annotations_count)
+
+            predictions_correctness_values.append(prediction_match_data["is_correct"])
+            precision_values.append(np.mean(predictions_correctness_values))
+
+        return recall_values, precision_values
+
+    @staticmethod
+    def get_mean_average_precision(predictions_matches_data, ground_truth_annotations_count):
+        """
+        Get VOC Pascal 2007 style mean average precision
+        :param predictions_matches_data: list of dictionaries, each contains prediction and information whether
+        it matched any ground truth annotation
+        :param ground_truth_annotations_count: int, number of ground truth annotations
+        :return: float
+        """
+
+        _recall_values, _precision_values = \
+            MeanAveragePrecisionComputer.get_recall_values_and_precision_values_data(
+                predictions_matches_data=predictions_matches_data,
+                ground_truth_annotations_count=ground_truth_annotations_count)
+
+        return 0
