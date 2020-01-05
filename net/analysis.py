@@ -142,6 +142,11 @@ class MatchingDataComputer:
 
                         matches_data["unmatched_predictions"].append(prediction)
 
+                matches_data["mean_average_precision_data"].extend(
+                    get_predictions_matches(
+                        ground_truth_annotations=ground_truth_annotations,
+                        predictions=predictions))
+
 
 def get_precision_recall_analysis_report(
         matched_annotations, unmatched_annotations, matched_predictions, unmatched_predictions):
@@ -365,36 +370,48 @@ def get_predictions_matches(ground_truth_annotations, predictions):
         # Convert set of unmatched ground truth annotations to a list, so we can work with its indices
         unmatched_ground_truth_annotations_list = list(unmatched_ground_truth_annotations)
 
-        # Get a boolean vector checking if prediction the same label as any ground truth annotations
-        categories_matches_vector = [ground_truth_annotation.label == prediction.label
-                                     for ground_truth_annotation in unmatched_ground_truth_annotations_list]
+        if len(unmatched_ground_truth_annotations_list) > 0:
 
-        annotations_bounding_boxes = np.array([
-            ground_truth_annotation.bounding_box for ground_truth_annotation in unmatched_ground_truth_annotations_list
-        ])
+            # Get a boolean vector checking if prediction the same label as any ground truth annotations
+            categories_matches_vector = [ground_truth_annotation.label == prediction.label
+                                         for ground_truth_annotation in unmatched_ground_truth_annotations_list]
 
-        # Return indices of ground truth annotation's boxes that have hight intersection over union with
-        # prediction's box
-        matched_boxes_indices = net.utilities.get_matched_boxes_indices(
-            prediction.bounding_box, np.array(annotations_bounding_boxes))
+            annotations_bounding_boxes = np.array([
+                ground_truth_annotation.bounding_box
+                for ground_truth_annotation in unmatched_ground_truth_annotations_list
+            ])
 
-        # Create boxes matches vector
-        boxes_matches_vector = np.zeros_like(categories_matches_vector)
-        boxes_matches_vector[matched_boxes_indices] = True
+            # Return indices of ground truth annotation's boxes that have hight intersection over union with
+            # prediction's box
+            matched_boxes_indices = net.utilities.get_matched_boxes_indices(
+                prediction.bounding_box, np.array(annotations_bounding_boxes))
 
-        # Create matches vector by doing logical and on categories and boxes vectors
-        matches_flags_vector = np.logical_and(categories_matches_vector, boxes_matches_vector)
+            # Create boxes matches vector
+            boxes_matches_vector = np.zeros_like(categories_matches_vector)
+            boxes_matches_vector[matched_boxes_indices] = True
 
-        # Record match data for the prediction
-        matches_data.append(
-            {
-                "prediction": prediction,
-                "is_correct": np.any(matches_flags_vector)
-            }
-        )
+            # Create matches vector by doing logical and on categories and boxes vectors
+            matches_flags_vector = np.logical_and(categories_matches_vector, boxes_matches_vector)
 
-        # Remove matched ground truth annotations from unmatched ground truth annotations set
-        unmatched_ground_truth_annotations = unmatched_ground_truth_annotations.difference(
-            np.array(unmatched_ground_truth_annotations_list)[matches_flags_vector])
+            # Record match data for the prediction
+            matches_data.append(
+                {
+                    "prediction": prediction,
+                    "is_correct": np.any(matches_flags_vector)
+                }
+            )
+
+            # Remove matched ground truth annotations from unmatched ground truth annotations set
+            unmatched_ground_truth_annotations = unmatched_ground_truth_annotations.difference(
+                np.array(unmatched_ground_truth_annotations_list)[matches_flags_vector])
+
+        else:
+
+            matches_data.append(
+                {
+                    "prediction": prediction,
+                    "is_correct": False
+                }
+            )
 
     return matches_data
