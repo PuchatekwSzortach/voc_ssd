@@ -82,6 +82,10 @@ class Annotation:
 
         return "Annotation: {}, {}".format(self.label, self.bounding_box)
 
+    def __hash__(self):
+
+        return hash((self.bounding_box, self.label, self.category_id))
+
 
 class Prediction(Annotation):
     """
@@ -92,6 +96,10 @@ class Prediction(Annotation):
 
         super().__init__(bounding_box, label, category_id)
         self.confidence = confidence
+
+    def __hash__(self):
+
+        return hash((self.bounding_box, self.confidence, self.label, self.category_id))
 
 
 class DefaultBoxDefinition:

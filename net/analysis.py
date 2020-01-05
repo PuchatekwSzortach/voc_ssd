@@ -336,3 +336,65 @@ def log_performance_with_annotations_size_analysis(logger, thresholds_matching_d
         y_range=(10, 100),
         size_factor=5,
         instances_threshold=10)
+
+
+def get_predictions_matches(ground_truth_annotations, predictions):
+    """
+    Get predictions matches - for each prediction return a dictionary with:
+    - prediction: net.utilities.Prediction instance
+    - is_correct: bool - whether prediction matches any ground truth annotation
+    Results are arranged by predictions' confidences, in descending order
+    This function computes predictions matches VOC 2007 mean average precision style - that is
+    ground truth annotation can be matched by only one prediction - so all lower-confidence predictions
+    that have high IOU with that ground truth annotation are counted as failed.
+    Match is counted if IOU with ground truth annotation is above 0.5.
+    :param ground_truth_annotations: list of net.utilities.Annotation instances, ground truth annotations
+    :param predictions: list of net.utilities.Prediction instances
+    :return: list of dictionaries, one for each prediction
+    """
+
+    sorted_predictions = sorted(predictions, key=lambda x: x.confidence, reverse=True)
+
+    # Set of ground truth annotations that weren't matched with any prediction yet
+    unmatched_ground_truth_annotations = set(ground_truth_annotations)
+
+    matches_data = []
+
+    for prediction in sorted_predictions:
+
+        # Convert set of unmatched ground truth annotations to a list, so we can work with its indices
+        unmatched_ground_truth_annotations_list = list(unmatched_ground_truth_annotations)
+
+        # Get a boolean vector checking if prediction the same label as any ground truth annotations
+        categories_matches_vector = [ground_truth_annotation.label == prediction.label
+                                     for ground_truth_annotation in unmatched_ground_truth_annotations_list]
+
+        annotations_bounding_boxes = np.array([
+            ground_truth_annotation.bounding_box for ground_truth_annotation in unmatched_ground_truth_annotations_list
+        ])
+
+        # Return indices of ground truth annotation's boxes that have hight intersection over union with
+        # prediction's box
+        matched_boxes_indices = net.utilities.get_matched_boxes_indices(
+            prediction.bounding_box, np.array(annotations_bounding_boxes))
+
+        # Create boxes matches vector
+        boxes_matches_vector = np.zeros_like(categories_matches_vector)
+        boxes_matches_vector[matched_boxes_indices] = True
+
+        # Create matches vector by doing logical and on categories and boxes vectors
+        matches_flags_vector = np.logical_and(categories_matches_vector, boxes_matches_vector)
+
+        # Record match data for the prediction
+        matches_data.append(
+            {
+                "prediction": prediction,
+                "is_correct": np.any(matches_flags_vector)
+            }
+        )
+
+        # Remove matched ground truth annotations from unmatched ground truth annotations set
+        unmatched_ground_truth_annotations = unmatched_ground_truth_annotations.difference(
+            np.array(unmatched_ground_truth_annotations_list)[matches_flags_vector])
+
+    return matches_data
