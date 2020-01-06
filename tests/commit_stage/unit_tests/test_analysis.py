@@ -150,5 +150,5 @@ class TestMeanAveragePrecisionComputer:
                 predictions_matches_data=predictions_matches_data,
                 ground_truth_annotations_count=4)
 
-        assert expected_recall_values == actual_recall_values
-        assert expected_precision_values == actual_precision_values
+        assert np.all(expected_recall_values == actual_recall_values)
+        assert np.all(expected_precision_values == actual_precision_values)

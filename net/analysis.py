@@ -462,19 +462,20 @@ class MeanAveragePrecisionComputer:
         sorted_predictions_matches_data = sorted(
             predictions_matches_data, key=lambda x: x["prediction"].confidence, reverse=True)
 
-        matched_ground_truth_annotations_count = 0
-        recall_values = []
-
         predictions_correctness_values = []
-        precision_values = []
 
         for prediction_match_data in sorted_predictions_matches_data:
 
-            matched_ground_truth_annotations_count += int(prediction_match_data["is_correct"])
-            recall_values.append(matched_ground_truth_annotations_count / ground_truth_annotations_count)
+            predictions_correctness_values.append(int(prediction_match_data["is_correct"]))
 
-            predictions_correctness_values.append(prediction_match_data["is_correct"])
-            precision_values.append(np.mean(predictions_correctness_values))
+        predictions_correctness_cumulative_sums = np.cumsum(predictions_correctness_values)
+
+        # Progressive recall values from first prediction till last
+        recall_values = predictions_correctness_cumulative_sums / ground_truth_annotations_count
+
+        # Progressive precision values from first prediction till last
+        precision_values = \
+            predictions_correctness_cumulative_sums / np.arange(1, len(predictions_correctness_values) + 1)
 
         return recall_values, precision_values
 
@@ -488,9 +489,9 @@ class MeanAveragePrecisionComputer:
         :return: float
         """
 
-        _recall_values, _precision_values = \
+        _recall_values, precision_values = \
             MeanAveragePrecisionComputer.get_recall_values_and_precision_values_data(
                 predictions_matches_data=predictions_matches_data,
                 ground_truth_annotations_count=ground_truth_annotations_count)
 
-        return 0
+        return np.mean(precision_values)
