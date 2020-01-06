@@ -116,7 +116,7 @@ class MatchingDataComputer:
                 predictions = net.ssd.PredictionsComputer(
                     categories=self.categories,
                     threshold=threshold,
-                    use_non_maximum_suppression=False).get_predictions(
+                    use_non_maximum_suppression=True).get_predictions(
                         default_boxes_matrix=default_boxes_matrix,
                         softmax_predictions_matrix=softmax_predictions_matrix)
 
@@ -444,7 +444,8 @@ def log_mean_average_precision_analysis(logger, thresholds_matching_data_map):
 
 class MeanAveragePrecisionComputer:
     """
-    Class for computing VOC Pascal 2007 style mean average precision
+    Class for computing VOC Pascal 2007 style mean average precision.
+    Based on notes from https://medium.com/@jonathan_hui/map-mean-average-precision-for-object-detection-45c121a31173
     """
 
     @staticmethod
@@ -494,4 +495,25 @@ class MeanAveragePrecisionComputer:
                 predictions_matches_data=predictions_matches_data,
                 ground_truth_annotations_count=ground_truth_annotations_count)
 
-        return np.mean(precision_values)
+        smoothed_out_precision_values = MeanAveragePrecisionComputer.get_smoothed_out_precision_values(
+            precision_values)
+
+        return np.mean(smoothed_out_precision_values)
+
+    @staticmethod
+    def get_smoothed_out_precision_values(precision_values):
+        """
+        Given progressive recall values and precision values for predictions from most to least confident,
+        smooth them out VOC Pascal 2007 style.
+        For each precision value replace it with the maximum value to its right.
+        :param precision_values: 1D numpy array of floats
+        :return: 1D numpy array of floats
+        """
+
+        # Flip precision values - numpy offers function that computes cumulative max from left to right,
+        # but we want this behaviour from right to left. The easiest solution is to flip array,
+        # compute cumulative maximum, then flip it back.
+        flipped_precision_values = np.flip(precision_values, axis=0)
+        cumulative_maximum_values = np.maximum.accumulate(flipped_precision_values)
+
+        return np.flip(cumulative_maximum_values, axis=0)

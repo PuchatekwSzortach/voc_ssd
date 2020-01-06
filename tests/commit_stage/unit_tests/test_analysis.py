@@ -152,3 +152,17 @@ class TestMeanAveragePrecisionComputer:
 
         assert np.all(expected_recall_values == actual_recall_values)
         assert np.all(expected_precision_values == actual_precision_values)
+
+    def test_get_smoothed_out_precision_values(self):
+        """
+        Test get_smoothed_out_precision_values function
+        """
+
+        precision_values = [1, 1, 0.5, 0.7, 0.3, 0.5]
+
+        expected = [1, 1, 0.7, 0.7, 0.5, 0.5]
+
+        actual = net.analysis.MeanAveragePrecisionComputer.get_smoothed_out_precision_values(
+            precision_values=precision_values)
+
+        assert np.all(expected == actual)
