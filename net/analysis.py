@@ -490,7 +490,7 @@ class MeanAveragePrecisionComputer:
         :return: float
         """
 
-        _recall_values, precision_values = \
+        recall_values, precision_values = \
             MeanAveragePrecisionComputer.get_recall_values_and_precision_values_data(
                 predictions_matches_data=predictions_matches_data,
                 ground_truth_annotations_count=ground_truth_annotations_count)
@@ -498,7 +498,10 @@ class MeanAveragePrecisionComputer:
         smoothed_out_precision_values = MeanAveragePrecisionComputer.get_smoothed_out_precision_values(
             precision_values)
 
-        return np.mean(smoothed_out_precision_values)
+        interpolated_precision_values = MeanAveragePrecisionComputer.get_interpolated_precision_values(
+            recall_values=recall_values, precision_values=smoothed_out_precision_values)
+
+        return np.mean(interpolated_precision_values)
 
     @staticmethod
     def get_smoothed_out_precision_values(precision_values):
@@ -517,3 +520,30 @@ class MeanAveragePrecisionComputer:
         cumulative_maximum_values = np.maximum.accumulate(flipped_precision_values)
 
         return np.flip(cumulative_maximum_values, axis=0)
+
+    @staticmethod
+    def get_interpolated_precision_values(recall_values, precision_values):
+        """
+        Given recall values and precision values, return precision values at recall values from 0 to 1 in 0.1 step.
+        If some recall values are never reached, we set interpolated precision values for them to 0.
+        :param recall_values: 1D numpy array of floats
+        :param precision_values: 1D numpy array floats
+        :return: 11-elements long 1D numpy array of floats,
+        """
+
+        # If we don't have recall values going all the way up to 0.9999, add recall values at 0.00001 above
+        # max value and at 1, set their respective precision values to 0.
+        # This way interpolation in this range will return precision of 0.
+        if recall_values[-1] < 0.9999:
+
+            recall_values = np.concatenate((recall_values, [recall_values[-1] + 0.0001, 1]))
+            precision_values = np.concatenate((precision_values, [0, 0]))
+
+        interpolation_coordinates = np.arange(start=0, stop=1.1, step=0.1)
+
+        interpolated_precision_values = np.interp(
+            x=interpolation_coordinates,
+            xp=recall_values,
+            fp=precision_values)
+
+        return interpolated_precision_values

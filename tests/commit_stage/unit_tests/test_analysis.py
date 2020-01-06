@@ -166,3 +166,61 @@ class TestMeanAveragePrecisionComputer:
             precision_values=precision_values)
 
         assert np.all(expected == actual)
+
+    def test_get_interpolated_precision_values_complete_recall_values_available(self):
+        """
+        Test get_interpolated_precision_values with input such that there are precision values available for
+        a full range of recall values
+        """
+
+        recall_values = [0, 0.05, 0.25, 0.75, 1]
+        precision_values = [0.5, 0.7, 0.8, 0.4, 0.2]
+
+        expected = [
+            0.5,  # At recall 0
+            0.725,  # At recall 0.1
+            0.775,  # At recall 0.2
+            0.76,  # At recall 0.3
+            0.68,  # At recall 0.4
+            0.6,  # At recall 0.5
+            0.52,  # At recall 0.6
+            0.44,  # At recall 0.7
+            0.36,  # At recall 0.8
+            0.28,  # At recall 0.9
+            0.2  # At recall 1
+        ]
+
+        actual = net.analysis.MeanAveragePrecisionComputer.get_interpolated_precision_values(
+            recall_values=recall_values,
+            precision_values=precision_values)
+
+        assert np.allclose(expected, actual)
+
+    def test_get_interpolated_precision_values_no_high_recall_values_available(self):
+        """
+        Test get_interpolated_precision_values with input such that there recall values don't go all the way
+        up to 1.
+        """
+
+        recall_values = [0, 0.05, 0.25, 0.75]
+        precision_values = [0.5, 0.7, 0.8, 0.4]
+
+        expected = [
+            0.5,  # At recall 0
+            0.725,  # At recall 0.1
+            0.775,  # At recall 0.2
+            0.76,  # At recall 0.3
+            0.68,  # At recall 0.4
+            0.6,  # At recall 0.5
+            0.52,  # At recall 0.6
+            0.44,  # At recall 0.7
+            0,  # At recall 0.8
+            0,  # At recall 0.9
+            0  # At recall 1
+        ]
+
+        actual = net.analysis.MeanAveragePrecisionComputer.get_interpolated_precision_values(
+            recall_values=recall_values,
+            precision_values=precision_values)
+
+        assert np.allclose(expected, actual)
