@@ -290,7 +290,7 @@ def test_get_matched_boxes_indices_decision_can_be_made_looking_at_borders():
     ])
 
     expected = np.array([1, 3])
-    actual = net.utilities.get_matched_boxes_indices(template_box, boxes_matrix)
+    actual = net.utilities.get_matched_boxes_indices(template_box, boxes_matrix, threshold=0.5)
 
     assert np.all(expected == actual)
 
@@ -312,7 +312,7 @@ def test_get_matched_boxes_indices_decision_can_be_made_looking_boxes_sizes_defa
     ])
 
     expected = np.array([0, 2])
-    actual = net.utilities.get_matched_boxes_indices(template_box, boxes_matrix)
+    actual = net.utilities.get_matched_boxes_indices(template_box, boxes_matrix, threshold=0.5)
 
     assert np.all(expected == actual)
 
@@ -334,7 +334,7 @@ def test_get_matched_boxes_boxes_indices_iou_has_to_be_calculated_to_make_decisi
     ])
 
     expected = np.array([0, 1, 3])
-    actual = net.utilities.get_matched_boxes_indices(template_box, boxes_matrix)
+    actual = net.utilities.get_matched_boxes_indices(template_box, boxes_matrix, threshold=0.5)
 
     assert np.all(expected == actual)
 
@@ -355,7 +355,7 @@ def test_get_matched_boxes_boxes_indices_some_boxes_can_be_discarded_early_some_
     ])
 
     expected = np.array([0, 3])
-    actual = net.utilities.get_matched_boxes_indices(template_box, boxes_matrix)
+    actual = net.utilities.get_matched_boxes_indices(template_box, boxes_matrix, threshold=0.5)
 
     assert np.all(expected == actual)
 

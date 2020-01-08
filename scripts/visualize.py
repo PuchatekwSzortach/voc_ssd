@@ -156,7 +156,7 @@ def log_default_boxes_matches_for_single_sample(
 
     for annotation in annotations:
         matched_default_boxes_indices = net.utilities.get_matched_boxes_indices(
-            annotation.bounding_box, default_boxes_matrix)
+            annotation.bounding_box, default_boxes_matrix, threshold=0.5)
 
         all_matched_default_boxes_indices.extend(matched_default_boxes_indices.tolist())
 
@@ -194,7 +194,7 @@ def get_default_boxes_matches_image(image, annotations, default_boxes_matrix):
     for annotation in annotations:
 
         matched_default_boxes_indices = net.utilities.get_matched_boxes_indices(
-            annotation.bounding_box, default_boxes_matrix)
+            annotation.bounding_box, default_boxes_matrix, threshold=0.5)
 
         all_matched_default_boxes_indices.extend(matched_default_boxes_indices.tolist())
 

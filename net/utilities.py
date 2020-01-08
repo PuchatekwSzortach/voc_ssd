@@ -345,14 +345,18 @@ def get_annotations_from_default_boxes(default_boxes_matrix):
     return [Annotation(default_box[:4]) for default_box in integer_boxes_matrix]
 
 
-def get_matched_boxes_indices(template_box, boxes_matrix):
+def get_matched_boxes_indices(template_box, boxes_matrix, threshold):
     """
     Checks for intersection over union between a matrix of boxes and a template box and returns indices
-    of boxes from the matrix that have intersection over union with the template box above 0.5
+    of boxes from the matrix that have intersection over union with the template box above threshold
     :param template_box: bounding box tuple (x_left, y_top, x_right, y_bottom)
     :param boxes_matrix: 2D numpy array of boxes in [x_left, y_top, x_right, y_bottom] order
+    :param threshold: float, must be not less than 0.5, since this function is optimized for such cases
     :return: 1D array of ints
     """
+
+    if threshold < 0.5:
+        raise ValueError("threshold value must be not less than 0.5, but {} was given".format(threshold))
 
     template_x_center = (template_box[0] + template_box[2]) / 2
 
@@ -383,7 +387,7 @@ def get_matched_boxes_indices(template_box, boxes_matrix):
     # Computer IOUs for boxes that made it through simple filters
     ious = get_vectorized_intersection_over_union(template_box, boxes_matrix[filtered_indices])
 
-    filtered_indices = filtered_indices[np.where(ious > 0.5)[0]]
+    filtered_indices = filtered_indices[np.where(ious > threshold)[0]]
     return filtered_indices
 
 

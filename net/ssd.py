@@ -117,12 +117,14 @@ class DefaultBoxesFactory:
         return np.array(boxes)
 
 
-def get_matching_analysis_generator(ssd_model_configuration, ssd_input_generator):
+def get_matching_analysis_generator(ssd_model_configuration, ssd_input_generator, threshold):
     """
     Generator that accepts ssd_input_generator and yield a generator that outputs tuples of
     matched_annotations and unmatched_annotations, both of which are lists of Annotation instances.
     :param ssd_model_configuration: dictionary of options specifying ssd model's configuration
     :param ssd_input_generator: generator that outputs (image, annotations) tuples
+    :param threshold: float, threshold above which box must overlap with ground truth annotation
+    to be counted as a match
     :return: generator that outputs (matched_annotations, unmatched_annotations) tuples
     """
 
@@ -139,7 +141,7 @@ def get_matching_analysis_generator(ssd_model_configuration, ssd_input_generator
         for annotation in annotations:
 
             matched_default_boxes_indices = net.utilities.get_matched_boxes_indices(
-                annotation.bounding_box, default_boxes_matrix)
+                annotation.bounding_box, default_boxes_matrix, threshold)
 
             if len(matched_default_boxes_indices) > 0:
 
@@ -188,8 +190,10 @@ class SSDTrainingLoopDataLoader:
             # as well as matched categories indices
             for annotation in annotations:
 
+                # Get matched boxes indices. Use a slightly higher iou threshold than 0.5 to encourage only
+                # confident matches
                 matched_default_boxes_indices = net.utilities.get_matched_boxes_indices(
-                    annotation.bounding_box, default_boxes_matrix)
+                    annotation.bounding_box, default_boxes_matrix, threshold=0.6)
 
                 all_matched_default_boxes_indices.extend(matched_default_boxes_indices)
 
@@ -368,7 +372,7 @@ def get_matched_default_boxes(annotations, default_boxes_matrix):
     for annotation in annotations:
 
         matched_default_boxes_indices = net.utilities.get_matched_boxes_indices(
-            annotation.bounding_box, default_boxes_matrix)
+            annotation.bounding_box, default_boxes_matrix, threshold=0.5)
 
         all_matched_default_boxes_indices.extend(matched_default_boxes_indices.tolist())
 

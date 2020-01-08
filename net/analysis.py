@@ -37,7 +37,7 @@ def is_annotation_matched(annotation, match_candidates):
 
     # Return indices of boxes that have intersection over union with annotation's box that's over 0.5
     matched_default_boxes_indices = net.utilities.get_matched_boxes_indices(
-        annotation.bounding_box, np.array(bounding_boxes))
+        annotation.bounding_box, np.array(bounding_boxes), threshold=0.5)
 
     # We have a match if matched_default_boxes_indices list is non-empty
     return len(matched_default_boxes_indices) > 0
@@ -384,7 +384,7 @@ def get_predictions_matches(ground_truth_annotations, predictions):
             # Return indices of ground truth annotation's boxes that have hight intersection over union with
             # prediction's box
             matched_boxes_indices = net.utilities.get_matched_boxes_indices(
-                prediction.bounding_box, np.array(annotations_bounding_boxes))
+                prediction.bounding_box, np.array(annotations_bounding_boxes), threshold=0.5)
 
             # Create boxes matches vector
             boxes_matches_vector = np.zeros_like(categories_matches_vector)

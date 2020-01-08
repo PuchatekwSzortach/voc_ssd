@@ -25,7 +25,7 @@ def analyse_theoretical_performance(config):
         size_factor=config["size_factor"])
 
     matching_analysis_generator = net.ssd.get_matching_analysis_generator(
-        config["vggish_model_configuration"], iter(voc_samples_loader))
+        config["vggish_model_configuration"], iter(voc_samples_loader), threshold=0.5)
 
     matched_annotations = []
     unmatched_annotations = []
