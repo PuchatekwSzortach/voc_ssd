@@ -3,6 +3,7 @@ Module with machine learning code
 """
 
 import os
+import pprint
 
 import numpy as np
 import tensorflow as tf
@@ -292,7 +293,7 @@ class VGGishModel:
                         samples_count=len(data_bunch.validation_data_loader))
                 }
 
-                print(epoch_log)
+                pprint.pprint(epoch_log)
 
                 for callback in callbacks:
                     callback.on_epoch_end(epoch_log)
@@ -415,15 +416,21 @@ class VGGishLocalizedModel:
         self.learning_rate = None
 
         self.ops_map = {
-            "default_boxes_categories_ids_vector_placeholder": tf.placeholder(dtype=tf.int32, shape=(None,)),
-            "learning_rate_placeholder": tf.placeholder(shape=None, dtype=tf.float32),
+            "default_boxes_categories_ids_vector_placeholder":
+                tf.placeholder(dtype=tf.int32, shape=(None,), name="boxes_categories_placeholder"),
+            "learning_rate_placeholder":
+                tf.placeholder(shape=None, dtype=tf.float32, name="learning_rate_placeholder"),
+            "batch_of_predictions_logits_matrices_op":
+                self.network.batch_of_predictions_logits_matrices_op,
+            "default_boxes_sizes_op":
+                tf.placeholder(shape=(None, 2), dtype=tf.int32, name="boxes_sizes_placeholder"),
+            "ground_truth_localization_offsets_matrix_op":
+                tf.placeholder(shape=(None, 4), dtype=tf.float32, name="ground_truth_offsets_placeholder"),
+            "batch_of_offsets_predictions_matrices_op": self.network.batch_of_localization_matrices_op
         }
 
-        self.ops_map["loss_op"] = self._get_loss_op(
-            default_boxes_categories_ids_vector_placeholder=self.ops_map[
-                "default_boxes_categories_ids_vector_placeholder"],
-            batch_of_predictions_logits_matrices_op=self.network.batch_of_predictions_logits_matrices_op
-        )
+        self.ops_map["loss_op"], self.ops_map["categorical_loss_op"], self.ops_map["offsets_loss_op"] = \
+            self._get_losses_ops(ops_map=self.ops_map)
 
         self.ops_map["train_op"] = tf.train.AdamOptimizer(
             learning_rate=self.ops_map["learning_rate_placeholder"]).minimize(self.ops_map["loss_op"])
@@ -454,15 +461,15 @@ class VGGishLocalizedModel:
 
                 epoch_log = {
                     "epoch_index": epoch_index,
-                    "training_loss": self._train_for_one_epoch(
+                    "training_losses_map": self._train_for_one_epoch(
                         data_generator=training_data_generator,
                         samples_count=len(data_bunch.training_data_loader)),
-                    "validation_loss": self._validate_for_one_epoch(
+                    "validation_losses_map": self._validate_for_one_epoch(
                         data_generator=validation_data_generator,
                         samples_count=len(data_bunch.validation_data_loader))
                 }
 
-                print(epoch_log)
+                pprint.pprint(epoch_log)
 
                 for callback in callbacks:
                     callback.on_epoch_end(epoch_log)
@@ -477,64 +484,93 @@ class VGGishLocalizedModel:
 
     def _train_for_one_epoch(self, data_generator, samples_count):
 
-        losses = []
+        losses_map = {
+            "total": [],
+            "categorical": [],
+            "offset": []
+        }
 
         for _ in tqdm.tqdm(range(samples_count)):
 
-            image, default_boxes_categories_ids_vector, _ = next(data_generator)
+            image, default_boxes_categories_ids_vector, default_boxes_sizes, localization_offsets = \
+                next(data_generator)
 
             feed_dictionary = {
                 self.network.input_placeholder: np.array([image]),
                 self.ops_map["default_boxes_categories_ids_vector_placeholder"]: default_boxes_categories_ids_vector,
-                self.ops_map["learning_rate_placeholder"]: self.learning_rate
+                self.ops_map["learning_rate_placeholder"]: self.learning_rate,
+                self.ops_map["default_boxes_sizes_op"]: default_boxes_sizes,
+                self.ops_map["ground_truth_localization_offsets_matrix_op"]: localization_offsets
             }
 
-            loss, _ = self.session.run(
-                [self.ops_map["loss_op"], self.ops_map["train_op"]], feed_dictionary)
+            total_loss, categorical_loss, offsets_loss, _ = self.session.run(
+                [self.ops_map["loss_op"], self.ops_map["categorical_loss_op"], self.ops_map["offsets_loss_op"],
+                 self.ops_map["train_op"]], feed_dictionary)
 
-            losses.append(loss)
+            losses_map["total"].append(total_loss)
+            losses_map["categorical"].append(categorical_loss)
+            losses_map["offset"].append(offsets_loss)
 
-        return np.mean(losses)
+        return {key: np.mean(value) for key, value in losses_map.items()}
 
     def _validate_for_one_epoch(self, data_generator, samples_count):
 
-        losses = []
+        losses_map = {
+            "total": [],
+            "categorical": [],
+            "offset": []
+        }
 
         for _ in tqdm.tqdm(range(samples_count)):
 
-            image, default_boxes_categories_ids_vector = next(data_generator)
+            image, default_boxes_categories_ids_vector, default_boxes_sizes, localization_offsets = \
+                next(data_generator)
 
             feed_dictionary = {
                 self.network.input_placeholder: np.array([image]),
-                self.ops_map["default_boxes_categories_ids_vector_placeholder"]: default_boxes_categories_ids_vector
+                self.ops_map["default_boxes_categories_ids_vector_placeholder"]: default_boxes_categories_ids_vector,
+                self.ops_map["learning_rate_placeholder"]: self.learning_rate,
+                self.ops_map["default_boxes_sizes_op"]: default_boxes_sizes,
+                self.ops_map["ground_truth_localization_offsets_matrix_op"]: localization_offsets
             }
 
-            loss = self.session.run(self.ops_map["loss_op"], feed_dictionary)
+            total_loss, categorical_loss, offsets_loss = self.session.run(
+                [self.ops_map["loss_op"], self.ops_map["categorical_loss_op"], self.ops_map["offsets_loss_op"]],
+                feed_dictionary)
 
-            losses.append(loss)
+            losses_map["total"].append(total_loss)
+            losses_map["categorical"].append(categorical_loss)
+            losses_map["offset"].append(offsets_loss)
 
-        return np.mean(losses)
+        return {key: np.mean(value) for key, value in losses_map.items()}
 
     @staticmethod
-    def _get_loss_op(
-            default_boxes_categories_ids_vector_placeholder,
-            batch_of_predictions_logits_matrices_op):
+    def _get_losses_ops(ops_map):
 
         # First flatten out batch dimension for batch_of_predictions_logits_matrices_op
         # Its batch dimension should be 1, we would tensorflow to raise an exception of it isn't
 
-        batch_of_predictions_logits_matrices_shape = tf.shape(batch_of_predictions_logits_matrices_op)
+        batch_of_predictions_logits_matrices_shape = tf.shape(ops_map["batch_of_predictions_logits_matrices_op"])
         default_boxes_count = batch_of_predictions_logits_matrices_shape[1]
         categories_count = batch_of_predictions_logits_matrices_shape[2]
 
         predictions_logits_matrix = tf.reshape(
-            batch_of_predictions_logits_matrices_op,
+            ops_map["batch_of_predictions_logits_matrices_op"],
             shape=(default_boxes_count, categories_count))
 
-        return net.ssd.get_single_shot_detector_loss_op(
-            default_boxes_categories_ids_vector_op=default_boxes_categories_ids_vector_placeholder,
+        localizations_offsets_predictions_matrix_op = tf.reshape(
+            ops_map["batch_of_offsets_predictions_matrices_op"],
+            shape=(default_boxes_count, 4))
+
+        losses_builder = net.ssd.SingleShotDetectorLossBuilder(
+            default_boxes_categories_ids_vector_op=ops_map["default_boxes_categories_ids_vector_placeholder"],
             predictions_logits_matrix_op=predictions_logits_matrix,
-            hard_negatives_mining_ratio=3)
+            hard_negatives_mining_ratio=3,
+            default_boxes_sizes_op=ops_map["default_boxes_sizes_op"],
+            ground_truth_localization_offsets_matrix_op=ops_map["ground_truth_localization_offsets_matrix_op"],
+            localizations_offsets_predictions_matrix_op=localizations_offsets_predictions_matrix_op)
+
+        return losses_builder.loss_op, losses_builder.categorical_loss_op, losses_builder.offsets_loss_op
 
     def save(self, save_path):
         """
@@ -556,12 +592,17 @@ class VGGishLocalizedModel:
     def predict(self, image):
         """
         Computes prediction on a single image
-        :param image: numpy array
-        :return: 2D numpy array, softmax_predictions_matrix
+        :param image: 3D numpy array representing an image
+        :return: 2 elements tuple,
+        (2D numpy array with softmax_predictions_matrix, 2D numpy array with offsets predictions)
         """
 
         feed_dictionary = {
             self.network.input_placeholder: np.array([image])
         }
 
-        return self.session.run(self.network.batch_of_softmax_predictions_matrices_op, feed_dictionary)[0]
+        categorical_predictions_batches, offsets_predictions_batches = self.session.run(
+            [self.network.batch_of_softmax_predictions_matrices_op, self.network.batch_of_localization_matrices_op],
+            feed_dictionary)
+
+        return categorical_predictions_batches[0], offsets_predictions_batches[0]

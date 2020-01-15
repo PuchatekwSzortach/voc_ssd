@@ -49,7 +49,9 @@ class ModelCheckpoint(Callback):
 
     def on_epoch_end(self, epoch_log):
 
-        has_loss_improved = epoch_log["validation_loss"] < 0.999 * self.best_validation_loss
+        validation_loss = epoch_log["validation_losses_map"]["total"]
+
+        has_loss_improved = validation_loss < 0.999 * self.best_validation_loss
         should_save_model = has_loss_improved and epoch_log["epoch_index"] >= self.skip_epochs_count
 
         # Save model if loss improved and we passed skip epochs count
@@ -57,13 +59,13 @@ class ModelCheckpoint(Callback):
 
             if self.verbose:
                 print("Validation loss improved from {} to {}, saving model".format(
-                    self.best_validation_loss, epoch_log["validation_loss"]))
+                    self.best_validation_loss, validation_loss))
 
             self.model.save(self.save_path)
 
         # If loss improved, update our best loss
         if has_loss_improved:
-            self.best_validation_loss = epoch_log["validation_loss"]
+            self.best_validation_loss = validation_loss
 
 
 class EarlyStopping(Callback):
@@ -89,9 +91,11 @@ class EarlyStopping(Callback):
 
     def on_epoch_end(self, epoch_log):
 
-        if epoch_log["validation_loss"] < 0.999 * self.best_validation_loss:
+        validation_loss = epoch_log["validation_losses_map"]["total"]
 
-            self.best_validation_loss = epoch_log["validation_loss"]
+        if validation_loss < 0.999 * self.best_validation_loss:
+
+            self.best_validation_loss = validation_loss
             self.epochs_since_last_improvement = 0
 
         else:
@@ -131,9 +135,11 @@ class ReduceLearningRateOnPlateau(Callback):
 
     def on_epoch_end(self, epoch_log):
 
-        if epoch_log["validation_loss"] < 0.999 * self.best_validation_loss:
+        validation_loss = epoch_log["validation_losses_map"]["total"]
 
-            self.best_validation_loss = epoch_log["validation_loss"]
+        if validation_loss < 0.999 * self.best_validation_loss:
+
+            self.best_validation_loss = validation_loss
             self.epoch_before_patience_runs_out = 0
 
         else:

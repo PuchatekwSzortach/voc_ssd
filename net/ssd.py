@@ -212,7 +212,7 @@ class SSDTrainingLoopDataLoader:
 class SSDTrainingLoopDataLoaderTwo:
     """
     Data loader class that outputs tuples
-    image, default_boxes_categories_ids_vector, localization_shifts)
+    image, default_boxes_categories_ids_vector, default_boxes_sizes, localization_shifts)
     or data suitable for training and evaluating SSD network
     """
 
@@ -241,7 +241,7 @@ class SSDTrainingLoopDataLoaderTwo:
             all_matched_default_boxes_indices = []
             all_matched_default_boxes_categories_ids = []
 
-            localization_shifts = []
+            localization_offsets = []
 
             # For each annotation collect indices of default boxes that were matched,
             # as well as matched categories indices
@@ -261,20 +261,25 @@ class SSDTrainingLoopDataLoaderTwo:
                     annotation.bounding_box - default_box
                     for default_box in default_boxes_matrix[matched_default_boxes_indices]]
 
-                localization_shifts.extend(local_localization_shifts)
+                localization_offsets.extend(local_localization_shifts)
 
             # Create a vector for all default boxes and set values to categories boxes were matched with
             default_boxes_categories_ids_vector = np.zeros(shape=default_boxes_matrix.shape[0], dtype=np.int32)
-            localization_shifts_matrix = np.zeros(shape=(default_boxes_matrix.shape[0], 4), dtype=np.float32)
+            localization_offsets_matrix = np.zeros(shape=(default_boxes_matrix.shape[0], 4), dtype=np.float32)
 
             if len(all_matched_default_boxes_indices) > 0:
 
                 default_boxes_categories_ids_vector[all_matched_default_boxes_indices] = \
                     all_matched_default_boxes_categories_ids
 
-                localization_shifts_matrix[all_matched_default_boxes_indices] = localization_shifts
+                localization_offsets_matrix[all_matched_default_boxes_indices] = localization_offsets
 
-            yield image, default_boxes_categories_ids_vector, localization_shifts_matrix
+            default_boxes_sizes = np.array([
+                default_boxes_matrix[:, 2] - default_boxes_matrix[:, 0],
+                default_boxes_matrix[:, 3] - default_boxes_matrix[:, 1]
+            ]).transpose()
+
+            yield image, default_boxes_categories_ids_vector, default_boxes_sizes, localization_offsets_matrix
 
 
 class PredictionsComputer:
@@ -424,6 +429,118 @@ def get_single_shot_detector_loss_op(
         pred=positive_matches_count_op > 0,
         true_fn=lambda: tf.reduce_mean(tf.concat([positive_losses_op, negative_losses_op], axis=0)),
         false_fn=lambda: tf.constant(0, dtype=tf.float32))
+
+
+class SingleShotDetectorLossBuilder:
+    """
+    Class for building SSD loss op
+    """
+
+    def __init__(
+            self, default_boxes_categories_ids_vector_op, predictions_logits_matrix_op, hard_negatives_mining_ratio,
+            default_boxes_sizes_op,
+            ground_truth_localization_offsets_matrix_op, localizations_offsets_predictions_matrix_op):
+        """
+        Constructor
+        :param default_boxes_categories_ids_vector_op: tensorflow tensor with shape (None,) and int type
+        :param predictions_logits_matrix_op: tensorflow tensor with shape (None, None) and float type
+        :param hard_negatives_mining_ratio: int - specifies ratio of hard negatives to positive samples
+        categorical loss op should use
+        :param default_boxes_sizes_op: tensorflow tensor with shape (None, 2) and int type,
+        each row represents width and height of corresponding default box
+        :param ground_truth_localization_offsets_matrix_op: tensorflow tensor with shape (None, 4) and float type,
+        each row represents correct offsets from ground truth annotations to default boxes.
+        If default box wasn't matched to any annotation, its row will be all zeros.
+        :param: localizations_offsets_predictions_matrix_op: tensorflow tensor with shape (None, 4) and float type,
+        network predictions for offsets from default boxes to ground truth boxes
+        """
+
+        self.default_boxes_categories_ids_vector_op = default_boxes_categories_ids_vector_op
+        self.predictions_logits_matrix_op = predictions_logits_matrix_op
+        self.hard_negatives_mining_ratio = hard_negatives_mining_ratio
+
+        self.default_boxes_sizes_op = default_boxes_sizes_op
+        self.ground_truth_localization_offsets_matrix_op = ground_truth_localization_offsets_matrix_op
+
+        self.localizations_offsets_predictions_matrix_op = localizations_offsets_predictions_matrix_op
+
+        default_boxes_count = tf.shape(self.default_boxes_categories_ids_vector_op)[0]
+
+        all_ones_op = tf.ones(shape=(default_boxes_count,), dtype=tf.float32)
+        all_zeros_op = tf.zeros(shape=(default_boxes_count,), dtype=tf.float32)
+
+        # Get a selector that's set to 1 where for boxes that are matched with ground truth annotations
+        # and to zero elsewhere
+        positive_matches_selector_op = tf.where(
+            self.default_boxes_categories_ids_vector_op > 0, all_ones_op, all_zeros_op)
+
+        positive_matches_count_op = tf.cast(tf.reduce_sum(positive_matches_selector_op), tf.int32)
+
+        self.categorical_loss_op = self._build_categorical_loss_op(
+            positive_matches_selector_op, positive_matches_count_op)
+
+        self.offsets_loss_op = self._build_localization_offsets_loss(
+            positive_matches_selector_op, positive_matches_count_op)
+
+        self.loss_op = (self.categorical_loss_op + self.offsets_loss_op) / 2.0
+
+    def _build_categorical_loss_op(self, positive_matches_selector_op, positive_matches_count_op):
+
+        raw_loss_op = tf.nn.sparse_softmax_cross_entropy_with_logits(
+            labels=self.default_boxes_categories_ids_vector_op, logits=self.predictions_logits_matrix_op)
+
+        # Get positive losses op - that is op with losses only for default bounding boxes
+        # that were matched with ground truth annotations.
+        # First multiply raw losses with selector op, so that all negative losses will be zero.
+        # Then sort losses in descending order and select positive_matches_count elements.
+        # Thus end effect is that we select positive losses only
+        positive_losses_op = tf.sort(
+            raw_loss_op * positive_matches_selector_op, direction='DESCENDING')[:positive_matches_count_op]
+
+        # Get negative losses op that is op with losses for default boxes that weren't matched with any ground truth
+        # annotations, or should predict background, in a similar manner as we did for positive losses.
+        # Choose x times positive matches count largest losses only for hard negatives mining
+        negative_losses_op = tf.sort(
+            raw_loss_op * (1.0 - positive_matches_selector_op),
+            direction='DESCENDING')[:(self.hard_negatives_mining_ratio * positive_matches_count_op)]
+
+        # If there were any positive matches at all, then return mean of both losses.
+        # Otherwise return 0 - as we can't have a mean of an empty op.
+        return tf.cond(
+            pred=positive_matches_count_op > 0,
+            true_fn=lambda: tf.reduce_mean(tf.concat([positive_losses_op, negative_losses_op], axis=0)),
+            false_fn=lambda: tf.constant(0, dtype=tf.float32))
+
+    def _build_localization_offsets_loss(self, positive_matches_selector_op, positive_matches_count_op):
+
+        # Get error between ground truth offsets and predicted offsets
+        offsets_errors_op = self.ground_truth_localization_offsets_matrix_op - \
+                        self.localizations_offsets_predictions_matrix_op
+
+        float_boxes_sizes_op = tf.cast(self.default_boxes_sizes_op, tf.float32)
+
+        # Scale errors by box width for x-offsets and box height for y-offsets, so their values
+        # are roughly within <-1, 1> scale
+        scaled_offsets_errors_op = tf.stack([
+            offsets_errors_op[:, 0] / float_boxes_sizes_op[:, 0],
+            offsets_errors_op[:, 1] / float_boxes_sizes_op[:, 1],
+            offsets_errors_op[:, 2] / float_boxes_sizes_op[:, 0],
+            offsets_errors_op[:, 3] / float_boxes_sizes_op[:, 1]
+            ], axis=1)
+
+        # Square errors to get positive values, compute mean value per box
+        raw_losses_op = tf.reduce_mean(tf.math.pow(scaled_offsets_errors_op, 2), axis=1)
+
+        # Multiply by matches selector, so that we only compute loss at default boxes that matched ground truth
+        # annotations, then select all these losses
+        positive_losses_op = tf.sort(
+            raw_losses_op * positive_matches_selector_op, direction='DESCENDING')[:positive_matches_count_op]
+
+        # # And finally return mean value of positives losses, or 0 if there were none
+        return tf.cond(
+            pred=positive_matches_count_op > 0,
+            true_fn=lambda: tf.reduce_mean(positive_losses_op),
+            false_fn=lambda: tf.constant(0, dtype=tf.float32))
 
 
 def get_matched_default_boxes(annotations, default_boxes_matrix):

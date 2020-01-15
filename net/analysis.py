@@ -89,11 +89,12 @@ class MatchingDataComputer:
         for _ in range(samples_count):
 
             image, ground_truth_annotations = next(iterator)
-            softmax_predictions_matrix = self.model.predict(image)
+            softmax_predictions_matrix, offsets_predictions_matrix = self.model.predict(image)
 
             # Put data on a queue, matching computations thread will process that data and put results into
             # thresholds_matched_data_map
-            samples_queue.put((image.shape, ground_truth_annotations, softmax_predictions_matrix))
+            samples_queue.put(
+                (image.shape, ground_truth_annotations, softmax_predictions_matrix, offsets_predictions_matrix))
 
         samples_queue.join()
         computations_thread.join()
@@ -104,7 +105,9 @@ class MatchingDataComputer:
 
         for _ in tqdm.tqdm(range(samples_count)):
 
-            image_shape, ground_truth_annotations, softmax_predictions_matrix = samples_queue.get()
+            image_shape, ground_truth_annotations, softmax_predictions_matrix, offsets_predictions_matrix = \
+                samples_queue.get()
+
             samples_queue.task_done()
 
             default_boxes_matrix = self.default_boxes_factory.get_default_boxes_matrix(image_shape)
@@ -117,7 +120,7 @@ class MatchingDataComputer:
                     categories=self.categories,
                     threshold=threshold,
                     use_non_maximum_suppression=True).get_predictions(
-                        default_boxes_matrix=default_boxes_matrix,
+                        default_boxes_matrix=default_boxes_matrix + offsets_predictions_matrix,
                         softmax_predictions_matrix=softmax_predictions_matrix)
 
                 # For each ground truth annotation, check if it was matched by any prediction

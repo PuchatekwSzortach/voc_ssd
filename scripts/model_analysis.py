@@ -23,13 +23,13 @@ def get_trained_model(config, model_checkpoint_path):
     :return: net.ml.VGGishModel instance
     """
 
-    network = net.ml.VGGishNetwork(
+    network = net.ml.VGGishLocalizationNetwork(
         model_configuration=config["vggish_model_configuration"],
         categories_count=len(config["categories"]))
 
     session = tf.keras.backend.get_session()
 
-    model = net.ml.VGGishModel(session, network)
+    model = net.ml.VGGishLocalizedModel(session, network)
     model.load(model_checkpoint_path)
 
     return model
