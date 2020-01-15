@@ -394,7 +394,7 @@ class SingleShotDetectorLossBuilder:
     def __init__(
             self, default_boxes_categories_ids_vector_op, predictions_logits_matrix_op, hard_negatives_mining_ratio,
             default_boxes_sizes_op,
-            ground_truth_localization_offsets_matrix_op, localizations_offsets_predictions_matrix_op):
+            ground_truth_offsets_matrix_op, offsets_predictions_matrix_op):
         """
         Constructor
         :param default_boxes_categories_ids_vector_op: tensorflow tensor with shape (None,) and int type
@@ -403,23 +403,24 @@ class SingleShotDetectorLossBuilder:
         categorical loss op should use
         :param default_boxes_sizes_op: tensorflow tensor with shape (None, 2) and int type,
         each row represents width and height of corresponding default box
-        :param ground_truth_localization_offsets_matrix_op: tensorflow tensor with shape (None, 4) and float type,
+        :param ground_truth_offsets_matrix_op: tensorflow tensor with shape (None, 4) and float type,
         each row represents correct offsets from ground truth annotations to default boxes.
         If default box wasn't matched to any annotation, its row will be all zeros.
         :param: localizations_offsets_predictions_matrix_op: tensorflow tensor with shape (None, 4) and float type,
         network predictions for offsets from default boxes to ground truth boxes
         """
 
-        self.default_boxes_categories_ids_vector_op = default_boxes_categories_ids_vector_op
-        self.predictions_logits_matrix_op = predictions_logits_matrix_op
+        self.ops_map = {
+            "default_boxes_categories_ids_vector_op": default_boxes_categories_ids_vector_op,
+            "predictions_logits_matrix_op": predictions_logits_matrix_op,
+            "default_boxes_sizes_op": default_boxes_sizes_op,
+            "ground_truth_offsets_matrix_op": ground_truth_offsets_matrix_op,
+            "offsets_predictions_matrix_op": offsets_predictions_matrix_op
+        }
+
         self.hard_negatives_mining_ratio = hard_negatives_mining_ratio
 
-        self.default_boxes_sizes_op = default_boxes_sizes_op
-        self.ground_truth_localization_offsets_matrix_op = ground_truth_localization_offsets_matrix_op
-
-        self.localizations_offsets_predictions_matrix_op = localizations_offsets_predictions_matrix_op
-
-        default_boxes_count = tf.shape(self.default_boxes_categories_ids_vector_op)[0]
+        default_boxes_count = tf.shape(self.ops_map["default_boxes_categories_ids_vector_op"])[0]
 
         all_ones_op = tf.ones(shape=(default_boxes_count,), dtype=tf.float32)
         all_zeros_op = tf.zeros(shape=(default_boxes_count,), dtype=tf.float32)
@@ -427,7 +428,7 @@ class SingleShotDetectorLossBuilder:
         # Get a selector that's set to 1 where for boxes that are matched with ground truth annotations
         # and to zero elsewhere
         positive_matches_selector_op = tf.where(
-            self.default_boxes_categories_ids_vector_op > 0, all_ones_op, all_zeros_op)
+            self.ops_map["default_boxes_categories_ids_vector_op"] > 0, all_ones_op, all_zeros_op)
 
         positive_matches_count_op = tf.cast(tf.reduce_sum(positive_matches_selector_op), tf.int32)
 
@@ -442,7 +443,8 @@ class SingleShotDetectorLossBuilder:
     def _build_categorical_loss_op(self, positive_matches_selector_op, positive_matches_count_op):
 
         raw_loss_op = tf.nn.sparse_softmax_cross_entropy_with_logits(
-            labels=self.default_boxes_categories_ids_vector_op, logits=self.predictions_logits_matrix_op)
+            labels=self.ops_map["default_boxes_categories_ids_vector_op"],
+            logits=self.ops_map["predictions_logits_matrix_op"])
 
         # Get positive losses op - that is op with losses only for default bounding boxes
         # that were matched with ground truth annotations.
@@ -469,10 +471,10 @@ class SingleShotDetectorLossBuilder:
     def _build_localization_offsets_loss(self, positive_matches_selector_op, positive_matches_count_op):
 
         # Get error between ground truth offsets and predicted offsets
-        offsets_errors_op = self.ground_truth_localization_offsets_matrix_op - \
-                        self.localizations_offsets_predictions_matrix_op
+        offsets_errors_op = \
+            self.ops_map["ground_truth_offsets_matrix_op"] - self.ops_map["offsets_predictions_matrix_op"]
 
-        float_boxes_sizes_op = tf.cast(self.default_boxes_sizes_op, tf.float32)
+        float_boxes_sizes_op = tf.cast(self.ops_map["default_boxes_sizes_op"], tf.float32)
 
         # Scale errors by box width for x-offsets and box height for y-offsets, so their values
         # are roughly within <-1, 1> scale

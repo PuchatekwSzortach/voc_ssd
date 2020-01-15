@@ -313,8 +313,8 @@ class VGGishModel:
             predictions_logits_matrix_op=predictions_logits_matrix,
             hard_negatives_mining_ratio=3,
             default_boxes_sizes_op=ops_map["default_boxes_sizes_op"],
-            ground_truth_localization_offsets_matrix_op=ops_map["ground_truth_localization_offsets_matrix_op"],
-            localizations_offsets_predictions_matrix_op=localizations_offsets_predictions_matrix_op)
+            ground_truth_offsets_matrix_op=ops_map["ground_truth_localization_offsets_matrix_op"],
+            offsets_predictions_matrix_op=localizations_offsets_predictions_matrix_op)
 
         return losses_builder.loss_op, losses_builder.categorical_loss_op, losses_builder.offsets_loss_op
 
