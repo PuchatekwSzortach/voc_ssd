@@ -77,7 +77,7 @@ def main():
     #     model_configuration=config["vggish_model_configuration"],
     #     categories_count=len(config["categories"]))
 
-    network = net.ml.VGGishLocalizationNetwork(
+    network = net.ml.VGGishNetwork(
         model_configuration=config["vggish_model_configuration"],
         categories_count=len(config["categories"]))
 
@@ -87,7 +87,7 @@ def main():
 
     # model = net.ml.VGGishModel(session, network)
     # model = net.ml.VGGishModel(session, network)
-    model = net.ml.VGGishLocalizedModel(session, network)
+    model = net.ml.VGGishModel(session, network)
 
     uninitialized_variables = set(tf.global_variables()).difference(initialized_variables)
     session.run(tf.variables_initializer(uninitialized_variables))

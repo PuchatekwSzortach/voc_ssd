@@ -91,64 +91,84 @@ class MatchingDataComputer:
             image, ground_truth_annotations = next(iterator)
             softmax_predictions_matrix, offsets_predictions_matrix = self.model.predict(image)
 
+            sample_data_map = {
+                "image_shape": image.shape,
+                "ground_truth_annotations": ground_truth_annotations,
+                "softmax_predictions_matrix": softmax_predictions_matrix,
+                "offsets_predictions_matrix": offsets_predictions_matrix
+            }
+
             # Put data on a queue, matching computations thread will process that data and put results into
             # thresholds_matched_data_map
-            samples_queue.put(
-                (image.shape, ground_truth_annotations, softmax_predictions_matrix, offsets_predictions_matrix))
+            samples_queue.put(sample_data_map)
 
         samples_queue.join()
         computations_thread.join()
 
         return thresholds_matched_data_map
 
-    def _matching_computations(self, thresholds_matched_data_map, samples_queue, samples_count):
+    def _matching_computations(self, thresholds_matched_data_map, samples_data_queue, samples_count):
 
         for _ in tqdm.tqdm(range(samples_count)):
 
-            image_shape, ground_truth_annotations, softmax_predictions_matrix, offsets_predictions_matrix = \
-                samples_queue.get()
+            # Get sample data from queue
+            sample_data_map = samples_data_queue.get()
 
-            samples_queue.task_done()
+            samples_data_queue.task_done()
 
-            default_boxes_matrix = self.default_boxes_factory.get_default_boxes_matrix(image_shape)
+            default_boxes_matrix = self.default_boxes_factory.get_default_boxes_matrix(sample_data_map["image_shape"])
 
+            # Compute matching data for sample at each threshold
             for threshold in self.thresholds:
-
-                matches_data = thresholds_matched_data_map[threshold]
 
                 predictions = net.ssd.PredictionsComputer(
                     categories=self.categories,
                     threshold=threshold,
                     use_non_maximum_suppression=True).get_predictions(
-                        default_boxes_matrix=default_boxes_matrix + offsets_predictions_matrix,
-                        softmax_predictions_matrix=softmax_predictions_matrix)
+                        default_boxes_matrix=default_boxes_matrix + sample_data_map["offsets_predictions_matrix"],
+                        softmax_predictions_matrix=sample_data_map["softmax_predictions_matrix"])
 
-                # For each ground truth annotation, check if it was matched by any prediction
-                for ground_truth_annotation in ground_truth_annotations:
+                matches_data_for_single_sample = self._get_matches_data(
+                    ground_truth_annotations=sample_data_map["ground_truth_annotations"],
+                    predictions=predictions)
 
-                    if is_annotation_matched(ground_truth_annotation, predictions):
+                matches_data = thresholds_matched_data_map[threshold]
 
-                        matches_data["matched_annotations"].append(ground_truth_annotation)
+                # Add computed matched data for current sample to stored data for all samples
+                for key, value in matches_data_for_single_sample.items():
 
-                    else:
+                    matches_data[key].extend(value)
 
-                        matches_data["unmatched_annotations"].append(ground_truth_annotation)
+    def _get_matches_data(self, ground_truth_annotations, predictions):
 
-                # For each prediction, check if it was matched by any ground truth annotation
-                for prediction in predictions:
+        matches_data = collections.defaultdict(list)
 
-                    if is_annotation_matched(prediction, ground_truth_annotations):
+        # For each ground truth annotation, check if it was matched by any prediction
+        for ground_truth_annotation in ground_truth_annotations:
 
-                        matches_data["matched_predictions"].append(prediction)
+            if is_annotation_matched(ground_truth_annotation, predictions):
 
-                    else:
+                matches_data["matched_annotations"].append(ground_truth_annotation)
 
-                        matches_data["unmatched_predictions"].append(prediction)
+            else:
 
-                matches_data["mean_average_precision_data"].extend(
-                    get_predictions_matches(
-                        ground_truth_annotations=ground_truth_annotations,
-                        predictions=predictions))
+                matches_data["unmatched_annotations"].append(ground_truth_annotation)
+
+        # For each prediction, check if it was matched by any ground truth annotation
+        for prediction in predictions:
+
+            if is_annotation_matched(prediction, ground_truth_annotations):
+
+                matches_data["matched_predictions"].append(prediction)
+
+            else:
+
+                matches_data["unmatched_predictions"].append(prediction)
+
+        matches_data["mean_average_precision_data"] = get_predictions_matches(
+            ground_truth_annotations=ground_truth_annotations, predictions=predictions)
+
+        return matches_data
 
 
 def get_precision_recall_analysis_report(
