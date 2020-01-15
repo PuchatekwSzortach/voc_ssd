@@ -392,13 +392,13 @@ class SingleShotDetectorLossBuilder:
     """
 
     def __init__(
-            self, default_boxes_categories_ids_vector_op, predictions_logits_matrix_op, hard_negatives_mining_ratio,
-            default_boxes_sizes_op,
+            self, default_boxes_categories_ids_vector_op, categories_predictions_logits_matrix_op,
+            hard_negatives_mining_ratio,default_boxes_sizes_op,
             ground_truth_offsets_matrix_op, offsets_predictions_matrix_op):
         """
         Constructor
         :param default_boxes_categories_ids_vector_op: tensorflow tensor with shape (None,) and int type
-        :param predictions_logits_matrix_op: tensorflow tensor with shape (None, None) and float type
+        :param categories_predictions_logits_matrix_op: tensorflow tensor with shape (None, None) and float type
         :param hard_negatives_mining_ratio: int - specifies ratio of hard negatives to positive samples
         categorical loss op should use
         :param default_boxes_sizes_op: tensorflow tensor with shape (None, 2) and int type,
@@ -412,7 +412,7 @@ class SingleShotDetectorLossBuilder:
 
         self.ops_map = {
             "default_boxes_categories_ids_vector_op": default_boxes_categories_ids_vector_op,
-            "predictions_logits_matrix_op": predictions_logits_matrix_op,
+            "predictions_logits_matrix_op": categories_predictions_logits_matrix_op,
             "default_boxes_sizes_op": default_boxes_sizes_op,
             "ground_truth_offsets_matrix_op": ground_truth_offsets_matrix_op,
             "offsets_predictions_matrix_op": offsets_predictions_matrix_op
@@ -435,7 +435,7 @@ class SingleShotDetectorLossBuilder:
         self.categorical_loss_op = self._build_categorical_loss_op(
             positive_matches_selector_op, positive_matches_count_op)
 
-        self.offsets_loss_op = self._build_localization_offsets_loss(
+        self.offsets_loss_op = self._build_offsets_loss(
             positive_matches_selector_op, positive_matches_count_op)
 
         self.loss_op = (self.categorical_loss_op + self.offsets_loss_op) / 2.0
@@ -468,7 +468,7 @@ class SingleShotDetectorLossBuilder:
             true_fn=lambda: tf.reduce_mean(tf.concat([positive_losses_op, negative_losses_op], axis=0)),
             false_fn=lambda: tf.constant(0, dtype=tf.float32))
 
-    def _build_localization_offsets_loss(self, positive_matches_selector_op, positive_matches_count_op):
+    def _build_offsets_loss(self, positive_matches_selector_op, positive_matches_count_op):
 
         # Get error between ground truth offsets and predicted offsets
         offsets_errors_op = \

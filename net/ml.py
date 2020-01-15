@@ -37,57 +37,58 @@ class VGGishNetwork:
             "block5_pool": vgg.get_layer("block5_pool").output,
         }
 
-        self.prediction_heads = {
-            "block2_head": self.get_prediction_head(
+        self.categories_predictions_heads = {
+            "block2_head": self.get_category_prediction_head(
                 input_op=ops_map["block2_pool"],
                 categories_count=categories_count,
                 head_configuration=model_configuration["block2_head"]),
-            "block3_head": self.get_prediction_head(
+            "block3_head": self.get_category_prediction_head(
                 input_op=ops_map["block3_pool"],
                 categories_count=categories_count,
                 head_configuration=model_configuration["block3_head"]),
-            "block4_head": self.get_prediction_head(
+            "block4_head": self.get_category_prediction_head(
                 input_op=ops_map["block4_pool"],
                 categories_count=categories_count,
                 head_configuration=model_configuration["block4_head"]),
-            "block5_head": self.get_prediction_head(
+            "block5_head": self.get_category_prediction_head(
                 input_op=ops_map["block5_pool"],
                 categories_count=categories_count,
                 head_configuration=model_configuration["block5_head"]),
         }
 
         # Create prediction logits assembling all prediction heads into a single matrix
-        predictions_heads_ops_list = \
-            [self.prediction_heads[name] for name in model_configuration["prediction_heads_order"]]
+        categories_predictions_heads_ops_list = \
+            [self.categories_predictions_heads[name] for name in model_configuration["prediction_heads_order"]]
 
-        self.batch_of_predictions_logits_matrices_op = tf.concat(predictions_heads_ops_list, axis=1)
+        self.batch_of_categories_predictions_logits_matrices_op = \
+            tf.concat(categories_predictions_heads_ops_list, axis=1)
 
-        self.batch_of_softmax_predictions_matrices_op = tf.nn.softmax(
-            self.batch_of_predictions_logits_matrices_op, axis=-1)
+        self.batch_of_softmax_categories_predictions_matrices_op = tf.nn.softmax(
+            self.batch_of_categories_predictions_logits_matrices_op, axis=-1)
 
-        self.localization_heads = {
-            "block2_head": self.get_localization_head(
+        self.offsets_predictions_heads = {
+            "block2_head": self.get_offsets_predictions_head(
                 input_op=ops_map["block2_pool"],
                 head_configuration=model_configuration["block2_head"]),
-            "block3_head": self.get_localization_head(
+            "block3_head": self.get_offsets_predictions_head(
                 input_op=ops_map["block3_pool"],
                 head_configuration=model_configuration["block3_head"]),
-            "block4_head": self.get_localization_head(
+            "block4_head": self.get_offsets_predictions_head(
                 input_op=ops_map["block4_pool"],
                 head_configuration=model_configuration["block4_head"]),
-            "block5_head": self.get_localization_head(
+            "block5_head": self.get_offsets_predictions_head(
                 input_op=ops_map["block5_pool"],
                 head_configuration=model_configuration["block5_head"]),
         }
 
         # Create localization logits assembling all prediction heads into a single matrix
-        localizations_heads_ops_list = \
-            [self.localization_heads[name] for name in model_configuration["prediction_heads_order"]]
+        offset_predictions_heads_ops_list = \
+            [self.offsets_predictions_heads[name] for name in model_configuration["prediction_heads_order"]]
 
-        self.batch_of_localization_matrices_op = tf.concat(localizations_heads_ops_list, axis=1)
+        self.batch_of_offsets_predictions_matrices_op = tf.concat(offset_predictions_heads_ops_list, axis=1)
 
     @staticmethod
-    def get_prediction_head(input_op, categories_count, head_configuration):
+    def get_category_prediction_head(input_op, categories_count, head_configuration):
         """
         Creates a prediction head
         :param input_op: input tensor
@@ -117,7 +118,7 @@ class VGGishNetwork:
         return tf.reshape(x, shape=(tf.shape(x)[0], -1, categories_count))
 
     @staticmethod
-    def get_localization_head(input_op, head_configuration):
+    def get_offsets_predictions_head(input_op, head_configuration):
         """
         Creates a localization head.
         :param input_op: input tensor
@@ -162,21 +163,24 @@ class VGGishModel:
         self.learning_rate = None
 
         self.ops_map = {
-            "default_boxes_categories_ids_vector_placeholder":
-                tf.placeholder(dtype=tf.int32, shape=(None,), name="boxes_categories_placeholder"),
-            "learning_rate_placeholder":
-                tf.placeholder(shape=None, dtype=tf.float32, name="learning_rate_placeholder"),
-            "batch_of_predictions_logits_matrices_op":
-                self.network.batch_of_predictions_logits_matrices_op,
-            "default_boxes_sizes_op":
-                tf.placeholder(shape=(None, 2), dtype=tf.int32, name="boxes_sizes_placeholder"),
-            "ground_truth_localization_offsets_matrix_op":
-                tf.placeholder(shape=(None, 4), dtype=tf.float32, name="ground_truth_offsets_placeholder"),
-            "batch_of_offsets_predictions_matrices_op": self.network.batch_of_localization_matrices_op
+            "default_boxes_categories_ids_vector_placeholder": tf.placeholder(
+                dtype=tf.int32, shape=(None,), name="boxes_categories_placeholder"),
+            "learning_rate_placeholder": tf.placeholder(
+                shape=None, dtype=tf.float32, name="learning_rate_placeholder"),
+            "batch_of_categories_predictions_logits_matrices_op":
+                self.network.batch_of_categories_predictions_logits_matrices_op,
+            "default_boxes_sizes_op": tf.placeholder(
+                shape=(None, 2), dtype=tf.int32, name="boxes_sizes_placeholder"),
+            "ground_truth_offsets_matrix_op": tf.placeholder(
+                shape=(None, 4), dtype=tf.float32, name="ground_truth_offsets_placeholder"),
+            "batch_of_offsets_predictions_matrices_op": self.network.batch_of_offsets_predictions_matrices_op
         }
 
-        self.ops_map["loss_op"], self.ops_map["categorical_loss_op"], self.ops_map["offsets_loss_op"] = \
-            self._get_losses_ops(ops_map=self.ops_map)
+        losses_ops = self._get_losses_ops(ops_map=self.ops_map)
+
+        self.ops_map["loss_op"] = losses_ops[0]
+        self.ops_map["categorical_loss_op"] = losses_ops[1]
+        self.ops_map["offsets_loss_op"] = losses_ops[2]
 
         self.ops_map["train_op"] = tf.train.AdamOptimizer(
             learning_rate=self.ops_map["learning_rate_placeholder"]).minimize(self.ops_map["loss_op"])
@@ -238,7 +242,7 @@ class VGGishModel:
 
         for _ in tqdm.tqdm(range(samples_count)):
 
-            image, default_boxes_categories_ids_vector, default_boxes_sizes, localization_offsets = \
+            image, default_boxes_categories_ids_vector, default_boxes_sizes, ground_truth_offsets = \
                 next(data_generator)
 
             feed_dictionary = {
@@ -246,7 +250,7 @@ class VGGishModel:
                 self.ops_map["default_boxes_categories_ids_vector_placeholder"]: default_boxes_categories_ids_vector,
                 self.ops_map["learning_rate_placeholder"]: self.learning_rate,
                 self.ops_map["default_boxes_sizes_op"]: default_boxes_sizes,
-                self.ops_map["ground_truth_localization_offsets_matrix_op"]: localization_offsets
+                self.ops_map["ground_truth_offsets_matrix_op"]: ground_truth_offsets
             }
 
             total_loss, categorical_loss, offsets_loss, _ = self.session.run(
@@ -269,7 +273,7 @@ class VGGishModel:
 
         for _ in tqdm.tqdm(range(samples_count)):
 
-            image, default_boxes_categories_ids_vector, default_boxes_sizes, localization_offsets = \
+            image, default_boxes_categories_ids_vector, default_boxes_sizes, ground_truth_offsets = \
                 next(data_generator)
 
             feed_dictionary = {
@@ -277,7 +281,7 @@ class VGGishModel:
                 self.ops_map["default_boxes_categories_ids_vector_placeholder"]: default_boxes_categories_ids_vector,
                 self.ops_map["learning_rate_placeholder"]: self.learning_rate,
                 self.ops_map["default_boxes_sizes_op"]: default_boxes_sizes,
-                self.ops_map["ground_truth_localization_offsets_matrix_op"]: localization_offsets
+                self.ops_map["ground_truth_offsets_matrix_op"]: ground_truth_offsets
             }
 
             total_loss, categorical_loss, offsets_loss = self.session.run(
@@ -296,25 +300,27 @@ class VGGishModel:
         # First flatten out batch dimension for batch_of_predictions_logits_matrices_op
         # Its batch dimension should be 1, we would tensorflow to raise an exception of it isn't
 
-        batch_of_predictions_logits_matrices_shape = tf.shape(ops_map["batch_of_predictions_logits_matrices_op"])
-        default_boxes_count = batch_of_predictions_logits_matrices_shape[1]
-        categories_count = batch_of_predictions_logits_matrices_shape[2]
+        batch_of_categories_predictions_logits_matrices_shape = \
+            tf.shape(ops_map["batch_of_categories_predictions_logits_matrices_op"])
 
-        predictions_logits_matrix = tf.reshape(
-            ops_map["batch_of_predictions_logits_matrices_op"],
+        default_boxes_count = batch_of_categories_predictions_logits_matrices_shape[1]
+        categories_count = batch_of_categories_predictions_logits_matrices_shape[2]
+
+        categories_predictions_logits_matrix = tf.reshape(
+            ops_map["batch_of_categories_predictions_logits_matrices_op"],
             shape=(default_boxes_count, categories_count))
 
-        localizations_offsets_predictions_matrix_op = tf.reshape(
+        offsets_predictions_matrix_op = tf.reshape(
             ops_map["batch_of_offsets_predictions_matrices_op"],
             shape=(default_boxes_count, 4))
 
         losses_builder = net.ssd.SingleShotDetectorLossBuilder(
             default_boxes_categories_ids_vector_op=ops_map["default_boxes_categories_ids_vector_placeholder"],
-            predictions_logits_matrix_op=predictions_logits_matrix,
+            categories_predictions_logits_matrix_op=categories_predictions_logits_matrix,
             hard_negatives_mining_ratio=3,
             default_boxes_sizes_op=ops_map["default_boxes_sizes_op"],
-            ground_truth_offsets_matrix_op=ops_map["ground_truth_localization_offsets_matrix_op"],
-            offsets_predictions_matrix_op=localizations_offsets_predictions_matrix_op)
+            ground_truth_offsets_matrix_op=ops_map["ground_truth_offsets_matrix_op"],
+            offsets_predictions_matrix_op=offsets_predictions_matrix_op)
 
         return losses_builder.loss_op, losses_builder.categorical_loss_op, losses_builder.offsets_loss_op
 
