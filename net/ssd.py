@@ -157,7 +157,7 @@ def get_matching_analysis_generator(ssd_model_configuration, ssd_input_generator
 class SSDTrainingLoopDataLoader:
     """
     Data loader class that outputs tuples
-    (image, default_boxes_categories_ids_vector)
+    image, default_boxes_categories_ids_vector, default_boxes_sizes, offsets)
     or data suitable for training and evaluating SSD network
     """
 
@@ -183,103 +183,58 @@ class SSDTrainingLoopDataLoader:
             image, annotations = next(iterator)
             default_boxes_matrix = self.default_boxes_factory.get_default_boxes_matrix(image.shape)
 
-            all_matched_default_boxes_indices = []
-            all_matched_default_boxes_categories_ids = []
+            matched_default_boxes_indices = []
+            matched_default_boxes_categories_ids = []
+
+            offsets = []
 
             # For each annotation collect indices of default boxes that were matched,
-            # as well as matched categories indices
+            # matched categories indices and offsets from ground truth boxes to default boxes
             for annotation in annotations:
 
-                # Get matched boxes indices. Use a slightly higher iou threshold than 0.5 to encourage only
-                # confident matches
-                matched_default_boxes_indices = net.utilities.get_matched_boxes_indices(
-                    annotation.bounding_box, default_boxes_matrix, threshold=0.6)
+                training_data = self._get_training_data_for_single_annotation(annotation, default_boxes_matrix)
 
-                all_matched_default_boxes_indices.extend(matched_default_boxes_indices)
-
-                matched_default_boxes_categories_ids = [annotation.category_id] * len(matched_default_boxes_indices)
-                all_matched_default_boxes_categories_ids.extend(matched_default_boxes_categories_ids)
+                matched_default_boxes_indices.extend(training_data["matched_default_boxes_indices"])
+                matched_default_boxes_categories_ids.extend(training_data["matched_default_boxes_categories_ids"])
+                offsets.extend(training_data["offsets"])
 
             # Create a vector for all default boxes and set values to categories boxes were matched with
             default_boxes_categories_ids_vector = np.zeros(shape=default_boxes_matrix.shape[0], dtype=np.int32)
+            offsets_matrix = np.zeros(shape=(default_boxes_matrix.shape[0], 4), dtype=np.float32)
 
-            default_boxes_categories_ids_vector[all_matched_default_boxes_indices] = \
-                all_matched_default_boxes_categories_ids
+            if len(matched_default_boxes_indices) > 0:
 
-            yield image, default_boxes_categories_ids_vector
+                default_boxes_categories_ids_vector[matched_default_boxes_indices] = \
+                    matched_default_boxes_categories_ids
 
-
-class SSDTrainingLoopDataLoaderTwo:
-    """
-    Data loader class that outputs tuples
-    image, default_boxes_categories_ids_vector, default_boxes_sizes, localization_shifts)
-    or data suitable for training and evaluating SSD network
-    """
-
-    def __init__(self, voc_samples_data_loader, ssd_model_configuration):
-        """
-        Constructor
-        :param voc_samples_data_loader: net.data.VOCSamplesDataLoader instance
-        """
-
-        self.voc_samples_data_loader = voc_samples_data_loader
-
-        self.default_boxes_factory = DefaultBoxesFactory(ssd_model_configuration)
-
-    def __len__(self):
-        return len(self.voc_samples_data_loader)
-
-    def __iter__(self):
-
-        iterator = iter(self.voc_samples_data_loader)
-
-        while True:
-
-            image, annotations = next(iterator)
-            default_boxes_matrix = self.default_boxes_factory.get_default_boxes_matrix(image.shape)
-
-            all_matched_default_boxes_indices = []
-            all_matched_default_boxes_categories_ids = []
-
-            localization_offsets = []
-
-            # For each annotation collect indices of default boxes that were matched,
-            # as well as matched categories indices
-            for annotation in annotations:
-
-                # Get matched boxes indices. Use a slightly higher iou threshold than 0.5 to encourage only
-                # confident matches
-                matched_default_boxes_indices = net.utilities.get_matched_boxes_indices(
-                    annotation.bounding_box, default_boxes_matrix, threshold=0.6)
-
-                all_matched_default_boxes_indices.extend(matched_default_boxes_indices)
-
-                matched_default_boxes_categories_ids = [annotation.category_id] * len(matched_default_boxes_indices)
-                all_matched_default_boxes_categories_ids.extend(matched_default_boxes_categories_ids)
-
-                local_localization_shifts = [
-                    annotation.bounding_box - default_box
-                    for default_box in default_boxes_matrix[matched_default_boxes_indices]]
-
-                localization_offsets.extend(local_localization_shifts)
-
-            # Create a vector for all default boxes and set values to categories boxes were matched with
-            default_boxes_categories_ids_vector = np.zeros(shape=default_boxes_matrix.shape[0], dtype=np.int32)
-            localization_offsets_matrix = np.zeros(shape=(default_boxes_matrix.shape[0], 4), dtype=np.float32)
-
-            if len(all_matched_default_boxes_indices) > 0:
-
-                default_boxes_categories_ids_vector[all_matched_default_boxes_indices] = \
-                    all_matched_default_boxes_categories_ids
-
-                localization_offsets_matrix[all_matched_default_boxes_indices] = localization_offsets
+                offsets_matrix[matched_default_boxes_indices] = offsets
 
             default_boxes_sizes = np.array([
                 default_boxes_matrix[:, 2] - default_boxes_matrix[:, 0],
                 default_boxes_matrix[:, 3] - default_boxes_matrix[:, 1]
             ]).transpose()
 
-            yield image, default_boxes_categories_ids_vector, default_boxes_sizes, localization_offsets_matrix
+            yield image, default_boxes_categories_ids_vector, default_boxes_sizes, offsets_matrix
+
+    @staticmethod
+    def _get_training_data_for_single_annotation(annotation, default_boxes_matrix):
+
+        # Get matched boxes indices. Use a slightly higher iou threshold than 0.5 to encourage only
+        # confident matches
+        matched_default_boxes_indices = net.utilities.get_matched_boxes_indices(
+            annotation.bounding_box, default_boxes_matrix, threshold=0.6)
+
+        matched_default_boxes_categories_ids = [annotation.category_id] * len(matched_default_boxes_indices)
+
+        offsets = [
+            annotation.bounding_box - default_box
+            for default_box in default_boxes_matrix[matched_default_boxes_indices]]
+
+        return {
+            "matched_default_boxes_indices": matched_default_boxes_indices,
+            "matched_default_boxes_categories_ids": matched_default_boxes_categories_ids,
+            "offsets": offsets
+        }
 
 
 class PredictionsComputer:

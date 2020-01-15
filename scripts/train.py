@@ -31,11 +31,7 @@ def get_ssd_training_loop_data_bunch(config):
         size_factor=config["size_factor"],
         augmentation_pipeline=net.data.get_image_augmentation_pipeline())
 
-    # ssd_training_samples_loader = net.ssd.SSDTrainingLoopDataLoader(
-    #     voc_samples_data_loader=training_samples_loader,
-    #     ssd_model_configuration=config["vggish_model_configuration"])
-
-    ssd_training_samples_loader = net.ssd.SSDTrainingLoopDataLoaderTwo(
+    ssd_training_samples_loader = net.ssd.SSDTrainingLoopDataLoader(
         voc_samples_data_loader=training_samples_loader,
         ssd_model_configuration=config["vggish_model_configuration"])
 
@@ -45,11 +41,7 @@ def get_ssd_training_loop_data_bunch(config):
         categories=config["categories"],
         size_factor=config["size_factor"])
 
-    # ssd_validation_samples_loader = net.ssd.SSDTrainingLoopDataLoader(
-    #     voc_samples_data_loader=validation_samples_loader,
-    #     ssd_model_configuration=config["vggish_model_configuration"])
-
-    ssd_validation_samples_loader = net.ssd.SSDTrainingLoopDataLoaderTwo(
+    ssd_validation_samples_loader = net.ssd.SSDTrainingLoopDataLoader(
         voc_samples_data_loader=validation_samples_loader,
         ssd_model_configuration=config["vggish_model_configuration"])
 
@@ -73,10 +65,6 @@ def main():
 
     data_bunch = get_ssd_training_loop_data_bunch(config)
 
-    # network = net.ml.VGGishNetwork(
-    #     model_configuration=config["vggish_model_configuration"],
-    #     categories_count=len(config["categories"]))
-
     network = net.ml.VGGishNetwork(
         model_configuration=config["vggish_model_configuration"],
         categories_count=len(config["categories"]))
@@ -85,8 +73,6 @@ def main():
 
     session = tf.keras.backend.get_session()
 
-    # model = net.ml.VGGishModel(session, network)
-    # model = net.ml.VGGishModel(session, network)
     model = net.ml.VGGishModel(session, network)
 
     uninitialized_variables = set(tf.global_variables()).difference(initialized_variables)
