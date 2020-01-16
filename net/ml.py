@@ -31,34 +31,24 @@ class VGGishNetwork:
         self.input_placeholder = vgg.input
 
         ops_map = {
-            "block2_pool": vgg.get_layer("block2_pool").output,
-            "block3_pool": vgg.get_layer("block3_pool").output,
-            "block4_pool": vgg.get_layer("block4_pool").output,
-            "block5_pool": vgg.get_layer("block5_pool").output,
+            "block2_head": vgg.get_layer("block2_pool").output,
+            "block3_head": vgg.get_layer("block3_pool").output,
+            "block4_head": vgg.get_layer("block4_pool").output,
+            "block5_head": vgg.get_layer("block5_pool").output,
         }
 
-        self.categories_predictions_heads = {
-            "block2_head": self.get_category_prediction_head(
-                input_op=ops_map["block2_pool"],
-                categories_count=categories_count,
-                head_configuration=model_configuration["block2_head"]),
-            "block3_head": self.get_category_prediction_head(
-                input_op=ops_map["block3_pool"],
-                categories_count=categories_count,
-                head_configuration=model_configuration["block3_head"]),
-            "block4_head": self.get_category_prediction_head(
-                input_op=ops_map["block4_pool"],
-                categories_count=categories_count,
-                head_configuration=model_configuration["block4_head"]),
-            "block5_head": self.get_category_prediction_head(
-                input_op=ops_map["block5_pool"],
-                categories_count=categories_count,
-                head_configuration=model_configuration["block5_head"]),
-        }
+        categories_predictions_heads_ops_list = []
+        offset_predictions_heads_ops_list = []
 
-        # Create prediction logits assembling all prediction heads into a single matrix
-        categories_predictions_heads_ops_list = \
-            [self.categories_predictions_heads[name] for name in model_configuration["prediction_heads_order"]]
+        for block in model_configuration["prediction_heads_order"]:
+
+            categories_predictions_head, offsets_predictions_head = self.get_predictions_head(
+                input_op=ops_map[block],
+                categories_count=categories_count,
+                head_configuration=model_configuration[block])
+
+            categories_predictions_heads_ops_list.append(categories_predictions_head)
+            offset_predictions_heads_ops_list.append(offsets_predictions_head)
 
         self.batch_of_categories_predictions_logits_matrices_op = \
             tf.concat(categories_predictions_heads_ops_list, axis=1)
@@ -66,37 +56,24 @@ class VGGishNetwork:
         self.batch_of_softmax_categories_predictions_matrices_op = tf.nn.softmax(
             self.batch_of_categories_predictions_logits_matrices_op, axis=-1)
 
-        self.offsets_predictions_heads = {
-            "block2_head": self.get_offsets_predictions_head(
-                input_op=ops_map["block2_pool"],
-                head_configuration=model_configuration["block2_head"]),
-            "block3_head": self.get_offsets_predictions_head(
-                input_op=ops_map["block3_pool"],
-                head_configuration=model_configuration["block3_head"]),
-            "block4_head": self.get_offsets_predictions_head(
-                input_op=ops_map["block4_pool"],
-                head_configuration=model_configuration["block4_head"]),
-            "block5_head": self.get_offsets_predictions_head(
-                input_op=ops_map["block5_pool"],
-                head_configuration=model_configuration["block5_head"]),
-        }
-
-        # Create localization logits assembling all prediction heads into a single matrix
-        offset_predictions_heads_ops_list = \
-            [self.offsets_predictions_heads[name] for name in model_configuration["prediction_heads_order"]]
-
         self.batch_of_offsets_predictions_matrices_op = tf.concat(offset_predictions_heads_ops_list, axis=1)
 
     @staticmethod
-    def get_category_prediction_head(input_op, categories_count, head_configuration):
+    def get_predictions_head(input_op, categories_count, head_configuration):
         """
-        Creates a prediction head
+        Create a prediction head from input op given head configuration. Prediction head contains two prediction ops,
+        one for categories and one for offsets.
         :param input_op: input tensor
         :param categories_count: int, number of filters output of prediction head should have - basically
-        we want prediction head to predict a one-hot encoding for each default fox
+        we want prediction head to predict a one-hot encoding for each default box
         :param head_configuration: dictionary with head configuration options
-        :return: tensor op
+        :return: tuple (categories logits predictions op, offsets predictions op)
         """
+
+        # Common part for both categories predictions and offsets predictions ops
+        x = tf.keras.layers.Conv2D(filters=256, kernel_size=(3, 3), padding='same', activation=tf.nn.swish)(input_op)
+        x = tf.keras.layers.Conv2D(filters=256, kernel_size=(3, 3), padding='same', activation=tf.nn.swish)(x)
+        x = tf.keras.layers.Conv2D(filters=256, kernel_size=(3, 3), padding='same', activation=tf.nn.swish)(x)
 
         # Compute total number of default boxes prediction head should make prediction for.
         # For each pixel prediction head receives it should make predictions for
@@ -106,43 +83,21 @@ class VGGishNetwork:
             len(head_configuration["base_bounding_box_sizes"]) * \
             2 * len(head_configuration["aspect_ratios"])
 
-        # For each default box we want to make one hot encoded prediction across categories
-        total_filters_count = default_boxes_count * categories_count
-
-        x = tf.keras.layers.Conv2D(filters=256, kernel_size=(3, 3), padding='same', activation=tf.nn.swish)(input_op)
-        x = tf.keras.layers.Conv2D(filters=256, kernel_size=(3, 3), padding='same', activation=tf.nn.swish)(x)
-        x = tf.keras.layers.Conv2D(filters=256, kernel_size=(3, 3), padding='same', activation=tf.nn.swish)(x)
-        x = tf.keras.layers.Conv2D(filters=total_filters_count, kernel_size=(3, 3), padding='same')(x)
-
-        # Reshape prediction to 3D matrix (batch_dimension, default boxes on all pixel locations, categories count)
-        return tf.reshape(x, shape=(tf.shape(x)[0], -1, categories_count))
-
-    @staticmethod
-    def get_offsets_predictions_head(input_op, head_configuration):
-        """
-        Creates a localization head.
-        :param input_op: input tensor
-        :param head_configuration: dictionary with head configuration options
-        :return: tensor op
-        """
-
-        # Compute total number of boxes prediction head should make at a single location
-        # For each pixel prediction head receives it should make predictions for
-        # base bounding boxes sizes count * 2 * aspect ratios count boxes centered on that pixel.
-        # We multiple aspect rations by 2, since we compute them both in horizontal and vertical orientation
-        default_boxes_count = \
-            len(head_configuration["base_bounding_box_sizes"]) * \
-            2 * len(head_configuration["aspect_ratios"])
+        # For each default box we want to make one hot encoded prediction across all categories
+        categories_logits_predictions_op = tf.keras.layers.Conv2D(
+            filters=default_boxes_count * categories_count, kernel_size=(3, 3), padding='same')(x)
 
         # For each default box we want to make 4 localization predictions - [x_left, y_top, x_right, y_bottom]
-        total_filters_count = 4 * default_boxes_count
+        offsets_predictions_op = tf.keras.layers.Conv2D(
+            filters=4 * default_boxes_count, kernel_size=(3, 3), padding='same')(x)
 
-        x = tf.keras.layers.Conv2D(filters=256, kernel_size=(3, 3), padding='same', activation=tf.nn.swish)(input_op)
-        x = tf.keras.layers.Conv2D(filters=256, kernel_size=(3, 3), padding='same', activation=tf.nn.swish)(x)
-        x = tf.keras.layers.Conv2D(filters=total_filters_count, kernel_size=(3, 3), padding='same')(x)
-
-        # Reshape prediction to 3D matrix (batch_dimension, default boxes on all pixel locations, 4)
-        return tf.reshape(x, shape=(tf.shape(x)[0], -1, 4))
+        # Reshape outputs to 3D matrices (batch_dimension, default boxes on all pixel locations, x), where
+        # x is categories_count for categories logits predictions op and 4 for offsets predictions op
+        return \
+            tf.reshape(categories_logits_predictions_op,
+                       shape=(tf.shape(categories_logits_predictions_op)[0], -1, categories_count)), \
+            tf.reshape(offsets_predictions_op,
+                       shape=(tf.shape(offsets_predictions_op)[0], -1, 4))
 
 
 class VGGishModel:
@@ -354,7 +309,8 @@ class VGGishModel:
         }
 
         categorical_predictions_batches, offsets_predictions_batches = self.session.run(
-            [self.network.batch_of_softmax_predictions_matrices_op, self.network.batch_of_localization_matrices_op],
+            [self.network.batch_of_softmax_categories_predictions_matrices_op,
+             self.network.batch_of_offsets_predictions_matrices_op],
             feed_dictionary)
 
         return categorical_predictions_batches[0], offsets_predictions_batches[0]

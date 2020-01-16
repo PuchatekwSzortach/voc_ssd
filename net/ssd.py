@@ -393,7 +393,7 @@ class SingleShotDetectorLossBuilder:
 
     def __init__(
             self, default_boxes_categories_ids_vector_op, categories_predictions_logits_matrix_op,
-            hard_negatives_mining_ratio,default_boxes_sizes_op,
+            hard_negatives_mining_ratio, default_boxes_sizes_op,
             ground_truth_offsets_matrix_op, offsets_predictions_matrix_op):
         """
         Constructor
