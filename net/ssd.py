@@ -255,31 +255,31 @@ class PredictionsComputer:
         self.threshold = threshold
         self.use_non_maximum_suppression = use_non_maximum_suppression
 
-    def get_predictions(self, default_boxes_matrix, softmax_predictions_matrix):
+    def get_predictions(self, bounding_boxes_matrix, softmax_predictions_matrix):
         """
         Get list of predicted annotations based on default boxes matrix and softmax predictions matrix
-        :param default_boxes_matrix: 2D numpy array, each row represents coordinates of a default bounding box
+        :param bounding_boxes_matrix: 2D numpy array, each row represents coordinates of a single bounding box
         :param softmax_predictions_matrix: 2D numpy array, each row represents one-hot encoded softmax predictions
-        for a corresponding default box
+        for a corresponding bounding box
         :return: list of net.utilities.Prediction instances
         """
 
         if self.use_non_maximum_suppression is True:
 
-            return self._get_soft_nms_predictions(default_boxes_matrix, softmax_predictions_matrix)
+            return self._get_soft_nms_predictions(bounding_boxes_matrix, softmax_predictions_matrix)
 
         else:
 
-            return self._get_raw_predictions(default_boxes_matrix, softmax_predictions_matrix)
+            return self._get_raw_predictions(bounding_boxes_matrix, softmax_predictions_matrix)
 
-    def _get_raw_predictions(self, default_boxes_matrix, softmax_predictions_matrix):
+    def _get_raw_predictions(self, bounding_boxes_matrix, softmax_predictions_matrix):
 
         # Get a selector for non-background predictions over threshold
         predictions_selector = \
             (np.argmax(softmax_predictions_matrix, axis=1) > 0) & \
             (np.max(softmax_predictions_matrix, axis=1) > self.threshold)
 
-        predictions_boxes = default_boxes_matrix[predictions_selector]
+        predictions_boxes = bounding_boxes_matrix[predictions_selector]
         predictions_categories_indices = np.argmax(softmax_predictions_matrix[predictions_selector], axis=1)
         predictions_confidences = np.max(softmax_predictions_matrix[predictions_selector], axis=1)
 
@@ -323,7 +323,7 @@ class PredictionsComputer:
             retained_detections_at_current_category = net.utilities.get_detections_after_soft_non_maximum_suppression(
                 detections=detections[predictions_categories_indices == category_id],
                 sigma=0.5,
-                score_threshold=0.7)
+                score_threshold=0.5)
 
             for detection in retained_detections_at_current_category:
 

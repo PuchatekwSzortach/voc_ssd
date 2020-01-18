@@ -125,7 +125,7 @@ class MatchingDataComputer:
                     categories=self.categories,
                     threshold=threshold,
                     use_non_maximum_suppression=True).get_predictions(
-                        default_boxes_matrix=default_boxes_matrix + sample_data_map["offsets_predictions_matrix"],
+                        bounding_boxes_matrix=default_boxes_matrix + sample_data_map["offsets_predictions_matrix"],
                         softmax_predictions_matrix=sample_data_map["softmax_predictions_matrix"])
 
                 matches_data_for_single_sample = self._get_matches_data(
@@ -139,7 +139,8 @@ class MatchingDataComputer:
 
                     matches_data[key].extend(value)
 
-    def _get_matches_data(self, ground_truth_annotations, predictions):
+    @staticmethod
+    def _get_matches_data(ground_truth_annotations, predictions):
 
         matches_data = collections.defaultdict(list)
 
@@ -378,7 +379,7 @@ def get_predictions_matches(ground_truth_annotations, predictions):
     Match is counted if IOU with ground truth annotation is above 0.5.
     :param ground_truth_annotations: list of net.utilities.Annotation instances, ground truth annotations
     :param predictions: list of net.utilities.Prediction instances
-    :return: list of dictionaries, one for each prediction
+    :return: list of dictionaries, one for each prediction, sorted by prediction confidence
     """
 
     sorted_predictions = sorted(predictions, key=lambda x: x.confidence, reverse=True)
@@ -404,10 +405,10 @@ def get_predictions_matches(ground_truth_annotations, predictions):
                 for ground_truth_annotation in unmatched_ground_truth_annotations_list
             ])
 
-            # Return indices of ground truth annotation's boxes that have hight intersection over union with
+            # Return indices of ground truth annotation's boxes that have high intersection over union with
             # prediction's box
             matched_boxes_indices = net.utilities.get_matched_boxes_indices(
-                prediction.bounding_box, np.array(annotations_bounding_boxes), threshold=0.5)
+                prediction.bounding_box, annotations_bounding_boxes, threshold=0.5)
 
             # Create boxes matches vector
             boxes_matches_vector = np.zeros_like(categories_matches_vector)

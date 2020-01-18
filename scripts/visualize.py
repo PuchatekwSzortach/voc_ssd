@@ -34,7 +34,7 @@ def log_voc_samples_generator_output(logger, config):
 
     categories_to_colors_map = net.utilities.get_categories_to_colors_map(config["categories"])
 
-    for _ in tqdm.tqdm(range(100)):
+    for _ in tqdm.tqdm(range(40)):
 
         image, annotations = next(generator)
 
@@ -51,90 +51,6 @@ def log_voc_samples_generator_output(logger, config):
         message = "{} - {}".format(image.shape[:2], labels)
 
         logger.info(vlogging.VisualRecord("Data", [image], message))
-
-
-def log_sample_with_odd_sized_annotation(logger, image, annotations, categories_to_colors_map, font_path):
-    """
-    Logs into a logger a single image and its annotations, writing dimensions details of each annotation
-    :param logger: logger instance
-    :param image: image to log
-    :param annotations: annotations for the image to log
-    :param categories_to_colors_map: dictionary mapping categories labels to colors
-    :param font_path: path to font to be used to draw labels text on image
-    """
-
-    colors = [categories_to_colors_map[annotation.label] for annotation in annotations]
-
-    image = net.plot.get_annotated_image(
-        image=image,
-        annotations=annotations,
-        colors=colors,
-        draw_labels=True,
-        font_path=font_path)
-
-    labels = []
-
-    for annotation in annotations:
-        label = "{} - width: {}, height: {}, aspect ratio: {}".format(
-            annotation.label, annotation.width, annotation.height, annotation.aspect_ratio)
-
-        labels.append(label)
-
-    labels_message = "\n".join(labels)
-    message = "{}\n{}".format(image.shape[:2], labels_message)
-
-    logger.info(vlogging.VisualRecord("Data", [image], message))
-
-
-def log_samples_with_odd_sized_annotations(logger, config):
-    """
-    Logs images with objects of odd sizes - suspiciously small, strange aspect ratios, etc
-    """
-
-    samples_loader = net.data.VOCSamplesDataLoader(
-        data_directory=config["voc"]["data_directory"],
-        data_set_path=config["voc"]["validation_set_path"],
-        categories=config["categories"],
-        size_factor=config["size_factor"])
-
-    generator = iter(samples_loader)
-
-    categories_to_colors_map = net.utilities.get_categories_to_colors_map(config["categories"])
-
-    all_annotations_count = 0
-    unusual_sized_annotation_count = 0
-
-    for _ in tqdm.tqdm(range(len(samples_loader))):
-
-        image, annotations = next(generator)
-
-        all_annotations_count += len(annotations)
-
-        unusual_sized_annotations = []
-
-        for annotation in annotations:
-
-            if net.utilities.is_annotation_size_unusual(
-                    annotation,
-                    config["objects_filtering"]["minimum_size"],
-                    config["objects_filtering"]["minimum_aspect_ratio"],
-                    config["objects_filtering"]["maximum_aspect_ratio"]):
-
-                unusual_sized_annotations.append(annotation)
-
-        unusual_sized_annotation_count += len(unusual_sized_annotations)
-
-        if len(unusual_sized_annotations) > 0:
-
-            log_sample_with_odd_sized_annotation(
-                logger=logger,
-                image=net.data.ImageProcessor.get_denormalized_image(image),
-                annotations=unusual_sized_annotations,
-                categories_to_colors_map=categories_to_colors_map,
-                font_path=config["font_path"])
-
-    print("Unusual object sizes counts to objects count: {}/{}".format(
-        unusual_sized_annotation_count, all_annotations_count))
 
 
 def log_default_boxes_matches_for_single_sample(
@@ -222,7 +138,7 @@ def log_default_boxes_matches(logger, config):
     default_boxes_factory = net.ssd.DefaultBoxesFactory(config["vggish_model_configuration"])
     categories_to_colors_map = net.utilities.get_categories_to_colors_map(config["categories"])
 
-    for _ in tqdm.tqdm(range(100)):
+    for _ in tqdm.tqdm(range(40)):
 
         log_default_boxes_matches_for_single_sample(
             logger, iter(samples_loader), default_boxes_factory, categories_to_colors_map, config["font_path"])
@@ -247,13 +163,14 @@ def log_ssd_training_loop_data_loader_outputs(logger, config):
 
     iterator = iter(ssd_validation_samples_loader)
 
-    for _ in range(20):
+    for _ in tqdm.tqdm(range(20)):
 
-        image, default_boxes_categories_ids_vector = next(iterator)
+        image, default_boxes_categories_ids_vector, _, _ = next(iterator)
 
         default_boxes_matrix = default_boxes_factory.get_default_boxes_matrix(image.shape)
 
         matched_boxes = default_boxes_matrix[default_boxes_categories_ids_vector > 0]
+
         matched_boxes_image = net.plot.get_image_with_boxes(
             image=net.data.ImageProcessor.get_denormalized_image(image),
             boxes=matched_boxes,
@@ -264,12 +181,11 @@ def log_ssd_training_loop_data_loader_outputs(logger, config):
             [net.data.ImageProcessor.get_denormalized_image(image), matched_boxes_image]))
 
 
-def log_single_prediction(logger, network, session, default_boxes_factory, samples_iterator, config):
+def log_single_prediction(logger, model, default_boxes_factory, samples_iterator, config):
     """
     Log network prediction on a single sample. Draws a single sample from samples_iterator
     :param logger: logger instance
-    :param network: net.ml.VGGishNetwork instance
-    :param session: tensorflow session
+    :param model: net.ml.VGGishModel instance
     :param default_boxes_factory: net.ssd.DefaultBoxesFactory instance
     :param samples_iterator: iterator that yields (image, ground truth annotations) tuples
     :param config: dictionary with configuration options
@@ -283,25 +199,22 @@ def log_single_prediction(logger, network, session, default_boxes_factory, sampl
         colors=[(255, 0, 0)] * len(ground_truth_annotations),
         font_path=config["font_path"])
 
-    softmax_predictions_matrix = session.run(
-        network.batch_of_softmax_predictions_matrices_op,
-        feed_dict={network.input_placeholder: np.array([image])})[0]
+    softmax_predictions_matrix, offsets_predictions_matrix = model.predict(image)
 
     default_boxes_matrix = default_boxes_factory.get_default_boxes_matrix(image.shape)
 
-    # Get annotations boxes and labels from predictions matrix and default boxes matrix
     predictions = net.ssd.PredictionsComputer(
         categories=config["categories"],
         threshold=0.5,
         use_non_maximum_suppression=False).get_predictions(
-            default_boxes_matrix=default_boxes_matrix,
+            bounding_boxes_matrix=default_boxes_matrix + offsets_predictions_matrix,
             softmax_predictions_matrix=softmax_predictions_matrix)
 
     predictions_with_nms = net.ssd.PredictionsComputer(
         categories=config["categories"],
         threshold=0.5,
         use_non_maximum_suppression=True).get_predictions(
-            default_boxes_matrix=default_boxes_matrix,
+            bounding_boxes_matrix=default_boxes_matrix + offsets_predictions_matrix,
             softmax_predictions_matrix=softmax_predictions_matrix)
 
     predicted_annotations_image = net.plot.get_annotated_image(
@@ -350,8 +263,7 @@ def log_predictions(logger, config):
 
         log_single_prediction(
             logger=logger,
-            network=network,
-            session=session,
+            model=model,
             default_boxes_factory=default_boxes_factory,
             samples_iterator=iterator,
             config=config)
@@ -391,7 +303,7 @@ def get_single_sample_debugging_visual_record(
         len(ground_truth_annotations), len(matched_default_boxes), len(predicted_annotations))
 
     record = vlogging.VisualRecord(
-        title="Debug info",
+        title="Debug info - raw image, ground truth annotations, matched default boxes, predictions",
         imgs=[
             image,
             ground_truth_annotations_image,
@@ -404,12 +316,11 @@ def get_single_sample_debugging_visual_record(
 
 
 def log_single_sample_debugging_info(
-        logger, network, session, default_boxes_factory, samples_iterator, config):
+        logger, model, default_boxes_factory, samples_iterator, config):
     """
     Log debugging info for a single sample. Draws a single sample from samples_iterator
     :param logger: logger instance
-    :param network: net.ml.VGGishNetwork instance
-    :param session: tensorflow Session instance
+    :param model: net.ml.VGGishModel instance
     :param default_boxes_factory: net.ssd.DefaultBoxesFactory instance
     :param samples_iterator: iterator that yields (image, ground truth annotations) tuples
     :param config: dictionary with configuration options
@@ -424,16 +335,14 @@ def log_single_sample_debugging_info(
         default_boxes_matrix=default_boxes_matrix)
 
     # Get predictions
-    softmax_predictions_matrix = session.run(
-        network.batch_of_softmax_predictions_matrices_op,
-        feed_dict={network.input_placeholder: np.array([image])})[0]
+    softmax_predictions_matrix, offsets_predictions_matrix = model.predict(image)
 
     # Get annotations boxes and labels from predictions matrix and default boxes matrix
     predictions = net.ssd.PredictionsComputer(
         categories=config["categories"],
         threshold=0.5,
         use_non_maximum_suppression=False).get_predictions(
-            default_boxes_matrix=default_boxes_matrix,
+            bounding_boxes_matrix=default_boxes_matrix + offsets_predictions_matrix,
             softmax_predictions_matrix=softmax_predictions_matrix)
 
     record = get_single_sample_debugging_visual_record(
@@ -475,8 +384,7 @@ def log_debugging_info(logger, config):
 
         log_single_sample_debugging_info(
             logger=logger,
-            network=network,
-            session=session,
+            model=model,
             default_boxes_factory=default_boxes_factory,
             samples_iterator=iterator,
             config=config)
@@ -538,10 +446,7 @@ def main():
     logger = net.utilities.get_logger(config["log_path"])
 
     # log_voc_samples_generator_output(logger, config)
-    # log_samples_with_odd_sized_annotations(logger, config)
-
     # log_default_boxes_matches(logger, config)
-
     # log_ssd_training_loop_data_loader_outputs(logger, config)
     log_predictions(logger, config)
     # log_debugging_info(logger, config)

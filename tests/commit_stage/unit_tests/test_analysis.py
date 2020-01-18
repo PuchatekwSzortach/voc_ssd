@@ -80,7 +80,7 @@ def test_get_heatmap_data_exceeding_max_size():
     assert np.all(expected == actual)
 
 
-def test_get_predictions_matches():
+def test_get_predictions_matches_on_simple_inputs():
     """
     Test get_predictions_matches on simple inputs
     """
@@ -110,6 +110,46 @@ def test_get_predictions_matches():
             "prediction": predictions[2],
             "is_correct": True,
         },
+    ]
+
+    actual = net.analysis.get_predictions_matches(ground_truth_annotations, predictions)
+
+    assert expected == actual
+
+
+def test_get_predictions_matches_with_multiple_predictions_for_the_same_ground_truth_annotation():
+    """
+    Test get_predictions_matches with multiple predictions for the same ground truth annotation
+    """
+
+    ground_truth_annotations = [
+        net.utilities.Annotation(bounding_box=[10, 10, 100, 100], label="car"),
+    ]
+
+    predictions = [
+        net.utilities.Prediction(bounding_box=[10, 10, 100, 100], confidence=0.8, label="car"),
+        net.utilities.Prediction(bounding_box=[10, 10, 100, 100], confidence=0.9, label="car"),
+        net.utilities.Prediction(bounding_box=[10, 10, 100, 100], confidence=0.7, label="car"),
+        net.utilities.Prediction(bounding_box=[10, 10, 100, 100], confidence=0.6, label="car")
+    ]
+
+    expected = [
+        {
+            "prediction": predictions[1],
+            "is_correct": True,
+        },
+        {
+            "prediction": predictions[0],
+            "is_correct": False,
+        },
+        {
+            "prediction": predictions[2],
+            "is_correct": False,
+        },
+        {
+            "prediction": predictions[3],
+            "is_correct": False,
+        }
     ]
 
     actual = net.analysis.get_predictions_matches(ground_truth_annotations, predictions)
