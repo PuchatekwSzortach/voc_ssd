@@ -5,7 +5,6 @@ Script with visualizations of data generators outputs, model prediction, etc
 import argparse
 import sys
 
-import numpy as np
 import tensorflow as tf
 import tqdm
 import vlogging
