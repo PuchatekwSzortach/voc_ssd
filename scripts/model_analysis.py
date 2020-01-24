@@ -53,6 +53,7 @@ def main():
     validation_samples_loader = net.data.VOCSamplesDataLoader(
         data_directory=config["voc"]["data_directory"],
         data_set_path=config["voc"]["validation_set_path"],
+        # data_set_path=config["voc"]["train_set_path"],
         categories=config["categories"],
         size_factor=config["size_factor"])
 
@@ -74,6 +75,13 @@ def main():
     net.analysis.log_mean_average_precision_analysis(
         logger=logger,
         thresholds_matching_data_map=thresholds_matching_data_map)
+
+    losses_map = net.analysis.get_mean_losses(
+        model=model,
+        ssd_model_configuration=config["vggish_model_configuration"],
+        samples_loader=validation_samples_loader)
+
+    logger.info("<br><h2>Losses map: {}</h2><br>".format(losses_map))
 
     net.analysis.log_performance_with_annotations_size_analysis(
         logger=logger,

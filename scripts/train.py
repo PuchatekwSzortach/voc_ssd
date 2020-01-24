@@ -37,6 +37,7 @@ def get_ssd_training_loop_data_bunch(config):
 
     validation_samples_loader = net.data.VOCSamplesDataLoader(
         data_directory=config["voc"]["data_directory"],
+        # data_set_path=config["voc"]["validation_set_path"],
         data_set_path=config["voc"]["train_set_path"],
         categories=config["categories"],
         size_factor=config["size_factor"])
@@ -81,11 +82,12 @@ def main():
     callbacks = [
         net.callbacks.ModelCheckpoint(
             save_path=config["model_checkpoint_path"],
-            skip_epochs_count=0),
-        net.callbacks.EarlyStopping(config["train"]["early_stopping_patience"]),
+            skip_epochs_count=2),
+        net.callbacks.EarlyStopping(
+            patience=config["train"]["early_stopping_patience"]),
         net.callbacks.ReduceLearningRateOnPlateau(
-            config["train"]["reduce_learning_rate_patience"],
-            config["train"]["reduce_learning_rate_factor"])
+            patience=config["train"]["reduce_learning_rate_patience"],
+            factor=config["train"]["reduce_learning_rate_factor"])
     ]
 
     model.train(

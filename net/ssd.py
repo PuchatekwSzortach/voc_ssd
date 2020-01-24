@@ -222,7 +222,7 @@ class SSDTrainingLoopDataLoader:
         # Get matched boxes indices. Use a slightly higher iou threshold than 0.5 to encourage only
         # confident matches
         matched_default_boxes_indices = net.utilities.get_matched_boxes_indices(
-            annotation.bounding_box, default_boxes_matrix, threshold=0.6)
+            annotation.bounding_box, default_boxes_matrix, threshold=0.5)
 
         matched_default_boxes_categories_ids = [annotation.category_id] * len(matched_default_boxes_indices)
 
@@ -425,7 +425,7 @@ class SingleShotDetectorLossBuilder:
         all_ones_op = tf.ones(shape=(default_boxes_count,), dtype=tf.float32)
         all_zeros_op = tf.zeros(shape=(default_boxes_count,), dtype=tf.float32)
 
-        # Get a selector that's set to 1 where for boxes that are matched with ground truth annotations
+        # Get a selector that's set to 1 for boxes that are matched with ground truth annotations
         # and to zero elsewhere
         positive_matches_selector_op = tf.where(
             self.ops_map["default_boxes_categories_ids_vector_op"] > 0, all_ones_op, all_zeros_op)
@@ -454,7 +454,7 @@ class SingleShotDetectorLossBuilder:
         positive_losses_op = tf.sort(
             raw_loss_op * positive_matches_selector_op, direction='DESCENDING')[:positive_matches_count_op]
 
-        # Get negative losses op that is op with losses for default boxes that weren't matched with any ground truth
+        # Get negative losses op, that is op with losses for default boxes that weren't matched with any ground truth
         # annotations, or should predict background, in a similar manner as we did for positive losses.
         # Choose x times positive matches count largest losses only for hard negatives mining
         negative_losses_op = tf.sort(

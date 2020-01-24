@@ -571,3 +571,47 @@ class MeanAveragePrecisionComputer:
             fp=precision_values)
 
         return interpolated_precision_values
+
+
+def get_mean_losses(model, ssd_model_configuration, samples_loader):
+    """
+    Get means losses for network across dataset
+    :param model: net.data.VOCSamplesDataLoader instance
+    :param ssd_model_configuration: dictionary with model configuration options
+    :param samples_loader: net.data.VOCSamplesDataLoader instance
+    :return: dictionary with mean losses values
+    """
+
+    ssd_samples_loader = net.ssd.SSDTrainingLoopDataLoader(
+        voc_samples_data_loader=samples_loader,
+        ssd_model_configuration=ssd_model_configuration)
+
+    losses_map = {
+        "total": [],
+        "categorical": [],
+        "offset": []
+    }
+
+    iterator = iter(ssd_samples_loader)
+
+    for _ in tqdm.tqdm(range(len(ssd_samples_loader))):
+
+        image, default_boxes_categories_ids_vector, default_boxes_sizes, ground_truth_offsets = \
+            next(iterator)
+
+        feed_dictionary = {
+            model.network.input_placeholder: np.array([image]),
+            model.ops_map["default_boxes_categories_ids_vector_placeholder"]: default_boxes_categories_ids_vector,
+            model.ops_map["default_boxes_sizes_op"]: default_boxes_sizes,
+            model.ops_map["ground_truth_offsets_matrix_op"]: ground_truth_offsets
+        }
+
+        total_loss, categorical_loss, offsets_loss = model.session.run(
+            [model.ops_map["loss_op"], model.ops_map["categorical_loss_op"], model.ops_map["offsets_loss_op"]],
+            feed_dictionary)
+
+        losses_map["total"].append(total_loss)
+        losses_map["categorical"].append(categorical_loss)
+        losses_map["offset"].append(offsets_loss)
+
+    return {key: np.mean(value) for key, value in losses_map.items()}
