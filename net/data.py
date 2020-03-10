@@ -131,9 +131,35 @@ class VOCSamplesDataLoader:
         self.size_factor = size_factor
         self.augmentation_pipeline = augmentation_pipeline
 
+        self.length = self._get_length()
+
     def __len__(self):
 
-        return len(self.images_filenames)
+        # return len(self.images_filenames)
+        return self.length
+
+    def _get_length(self):
+
+        samples_count = 0
+
+        for image_filename in self.images_filenames:
+
+            annotations_path = os.path.join(self.data_directory, "Annotations", image_filename + ".xml")
+
+            with open(annotations_path) as file:
+                image_annotations = xmltodict.parse(file.read())
+
+            annotations = get_objects_annotations(image_annotations, self.labels_to_categories_index_map)
+
+            # Only use some categories
+            annotations = [annotation for annotation in annotations if
+                           annotation.category_id == self.labels_to_categories_index_map["car"]]
+
+            if len(annotations) > 0:
+
+                samples_count += 1
+
+        return samples_count
 
     def __iter__(self):
 
@@ -145,9 +171,6 @@ class VOCSamplesDataLoader:
 
             for image_filename in local_images_filenames:
 
-                image_path = os.path.join(self.data_directory, "JPEGImages", image_filename + ".jpg")
-                image = cv2.imread(image_path)
-
                 annotations_path = os.path.join(self.data_directory, "Annotations", image_filename + ".xml")
 
                 with open(annotations_path) as file:
@@ -156,20 +179,30 @@ class VOCSamplesDataLoader:
 
                 annotations = get_objects_annotations(image_annotations, self.labels_to_categories_index_map)
 
-                if self.augmentation_pipeline is not None:
+                # Only use some categories
+                annotations = [annotation for annotation in annotations if
+                               annotation.category_id == self.labels_to_categories_index_map["car"]]
 
-                    image, annotations = get_augmented_sample(
-                        image=image, annotations=annotations, augmentation_pipeline=self.augmentation_pipeline)
+                # Only yield a sample if it has any annotations for categories we want to train on
+                if len(annotations) > 0:
 
-                bounding_boxes = [annotation.bounding_box for annotation in annotations]
+                    image_path = os.path.join(self.data_directory, "JPEGImages", image_filename + ".jpg")
+                    image = cv2.imread(image_path)
 
-                image, resized_bounding_boxes = net.utilities.get_resized_sample(
-                    image, bounding_boxes, size_factor=self.size_factor)
+                    if self.augmentation_pipeline is not None:
 
-                for index, bounding_box in enumerate(resized_bounding_boxes):
-                    annotations[index].bounding_box = bounding_box
+                        image, annotations = get_augmented_sample(
+                            image=image, annotations=annotations, augmentation_pipeline=self.augmentation_pipeline)
 
-                yield ImageProcessor.get_normalized_image(image), annotations
+                    bounding_boxes = [annotation.bounding_box for annotation in annotations]
+
+                    image, resized_bounding_boxes = net.utilities.get_resized_sample(
+                        image, bounding_boxes, size_factor=self.size_factor)
+
+                    for index, bounding_box in enumerate(resized_bounding_boxes):
+                        annotations[index].bounding_box = bounding_box
+
+                    yield ImageProcessor.get_normalized_image(image), annotations
 
 
 def get_augmented_sample(image, annotations, augmentation_pipeline):

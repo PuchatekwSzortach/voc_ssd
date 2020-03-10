@@ -438,7 +438,9 @@ class SingleShotDetectorLossBuilder:
         self.offsets_loss_op = self._build_offsets_loss(
             positive_matches_selector_op, positive_matches_count_op)
 
-        self.loss_op = (self.categorical_loss_op + self.offsets_loss_op) / 2.0
+        # self.loss_op = (self.categorical_loss_op + self.offsets_loss_op) / 2.0
+        # Disable offsets loss for now
+        self.loss_op = self.categorical_loss_op
 
     def _build_categorical_loss_op(self, positive_matches_selector_op, positive_matches_count_op):
 
