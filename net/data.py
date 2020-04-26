@@ -131,35 +131,9 @@ class VOCSamplesDataLoader:
         self.size_factor = size_factor
         self.augmentation_pipeline = augmentation_pipeline
 
-        self.length = self._get_length()
-
     def __len__(self):
 
-        # return len(self.images_filenames)
-        return self.length
-
-    def _get_length(self):
-
-        samples_count = 0
-
-        for image_filename in self.images_filenames:
-
-            annotations_path = os.path.join(self.data_directory, "Annotations", image_filename + ".xml")
-
-            with open(annotations_path) as file:
-                image_annotations = xmltodict.parse(file.read())
-
-            annotations = get_objects_annotations(image_annotations, self.labels_to_categories_index_map)
-
-            # Only use some categories
-            annotations = [annotation for annotation in annotations if
-                           annotation.category_id == self.labels_to_categories_index_map["car"]]
-
-            if len(annotations) > 0:
-
-                samples_count += 1
-
-        return samples_count
+        return len(self.images_filenames)
 
     def __iter__(self):
 
@@ -178,10 +152,6 @@ class VOCSamplesDataLoader:
                     image_annotations = xmltodict.parse(file.read())
 
                 annotations = get_objects_annotations(image_annotations, self.labels_to_categories_index_map)
-
-                # Only use some categories
-                annotations = [annotation for annotation in annotations if
-                               annotation.category_id == self.labels_to_categories_index_map["car"]]
 
                 # Only yield a sample if it has any annotations for categories we want to train on
                 if len(annotations) > 0:

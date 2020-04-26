@@ -12,6 +12,7 @@ import net.callbacks
 import net.data
 import net.ml
 import net.ssd
+import net.utilities
 
 
 def get_ssd_training_loop_data_bunch(config):
@@ -86,7 +87,10 @@ def main():
             patience=config["train"]["early_stopping_patience"]),
         net.callbacks.ReduceLearningRateOnPlateau(
             patience=config["train"]["reduce_learning_rate_patience"],
-            factor=config["train"]["reduce_learning_rate_factor"])
+            factor=config["train"]["reduce_learning_rate_factor"]),
+        net.callbacks.HistoryLogger(
+            logger=net.utilities.get_logger(config["log_path"])
+        )
     ]
 
     model.train(

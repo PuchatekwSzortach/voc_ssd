@@ -5,6 +5,7 @@ voc:
   train_and_validation_set_path: "ImageSets/Main/trainval.txt"
 
 log_path: "/tmp/voc_ssd.html"
+training_history_log_path: "/tmp/voc_ssd_training_history_log.txt"
 
 categories:
     ['background',

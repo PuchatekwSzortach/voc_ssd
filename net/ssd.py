@@ -446,7 +446,8 @@ class SingleShotDetectorLossBuilder:
 
         # Get positive losses op - that is op with losses only for default bounding boxes
         # that were matched with ground truth annotations.
-        # First multiply raw losses with selector op, so that all negative losses will be zero.
+        # First multiply raw losses with selector op, so that losses for all boxes matched with
+        # background will be set zero.
         # Then sort losses in descending order and select positive_matches_count elements.
         # Thus end effect is that we select positive losses only
         positive_losses_op = tf.sort(

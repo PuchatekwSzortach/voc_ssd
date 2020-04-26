@@ -173,6 +173,9 @@ class LearningRateScheduler(Callback):
         self.verbose = verbose
 
     def on_epoch_end(self, epoch_log):
+        """
+        Callback called on epoch end
+        """
 
         if epoch_log["epoch_index"] in self.schedule:
 
@@ -180,3 +183,26 @@ class LearningRateScheduler(Callback):
 
             if self.verbose:
                 print("LearningRateScheduler changed learning rate to {}".format(self.model.learning_rate))
+
+
+class HistoryLogger(Callback):
+    """
+    Callback that training history
+    """
+
+    def __init__(self, logger):
+        """
+        Constructor
+        :param logger: logging.Logger instance
+        """
+
+        super().__init__()
+
+        self.logger = logger
+
+    def on_epoch_end(self, epoch_log):
+        """
+        Callback called on epoch end
+        """
+
+        self.logger.info(epoch_log)
