@@ -56,10 +56,10 @@ vggish_model_configuration:
 
 
 train:
-  epochs: 75
+  epochs: 100
   learning_rate: 0.00001
-  early_stopping_patience: 8
-  reduce_learning_rate_patience: 3
+  early_stopping_patience: 5
+  reduce_learning_rate_patience: 2
   reduce_learning_rate_factor: 0.1
 
 model_checkpoint_path: "../../data/voc_ssd_models/current_model/"

@@ -165,10 +165,10 @@ class SSDTrainingLoopDataLoader:
         """
         Constructor
         :param voc_samples_data_loader: net.data.VOCSamplesDataLoader instance
+        :param ssd_model_configuration: map with model configuration
         """
 
         self.voc_samples_data_loader = voc_samples_data_loader
-
         self.default_boxes_factory = DefaultBoxesFactory(ssd_model_configuration)
 
     def __len__(self):
@@ -219,8 +219,6 @@ class SSDTrainingLoopDataLoader:
     @staticmethod
     def _get_training_data_for_single_annotation(annotation, default_boxes_matrix):
 
-        # Get matched boxes indices. Use a slightly higher iou threshold than 0.5 to encourage only
-        # confident matches
         matched_default_boxes_indices = net.utilities.get_matched_boxes_indices(
             annotation.bounding_box, default_boxes_matrix, threshold=0.5)
 
@@ -438,9 +436,7 @@ class SingleShotDetectorLossBuilder:
         self.offsets_loss_op = self._build_offsets_loss(
             positive_matches_selector_op, positive_matches_count_op)
 
-        # self.loss_op = (self.categorical_loss_op + self.offsets_loss_op) / 2.0
-        # Disable offsets loss for now
-        self.loss_op = self.categorical_loss_op
+        self.loss_op = (self.categorical_loss_op + self.offsets_loss_op) / 2.0
 
     def _build_categorical_loss_op(self, positive_matches_selector_op, positive_matches_count_op):
 

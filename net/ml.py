@@ -253,7 +253,7 @@ class VGGishModel:
     def _get_losses_ops(ops_map):
 
         # First flatten out batch dimension for batch_of_predictions_logits_matrices_op
-        # Its batch dimension should be 1, we would like tensorflow to raise an exception of it isn't
+        # Its batch dimension should be 1, we would like tensorflow to raise an exception if it isn't
 
         batch_of_categories_predictions_logits_matrices_shape = \
             tf.shape(ops_map["batch_of_categories_predictions_logits_matrices_op"])

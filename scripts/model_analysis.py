@@ -53,7 +53,6 @@ def main():
     validation_samples_loader = net.data.VOCSamplesDataLoader(
         data_directory=config["voc"]["data_directory"],
         data_set_path=config["voc"]["validation_set_path"],
-        # data_set_path=config["voc"]["train_set_path"],
         categories=config["categories"],
         size_factor=config["size_factor"])
 

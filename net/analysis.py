@@ -176,13 +176,14 @@ def get_precision_recall_analysis_report(
         matched_annotations, unmatched_annotations, matched_predictions, unmatched_predictions):
     """
     Get report string for precision recall analysis
-    :param matched_annotations: list of net.data.Annotation instances, annotations that had matching predictions
-    :param unmatched_annotations:
-    list of net.data.Annotation instances, annotations that didn't have matching predictions
+    :param matched_annotations: list of net.data.Annotation instances,
+    ground truth annotations that had matching predictions
+    :param unmatched_annotations: list of net.data.Annotation instances,
+    ground truth annotations that didn't have matching predictions
     :param matched_predictions: list of net.data.Annotation instances,
     predictions that had matching ground truth annotations
     :param unmatched_predictions: list of net.data.Annotation instances,
-    annotations that didn't have matching predictions
+    predictions that didn't have matching ground truth annotations
     :return: str
     """
     messages = []
@@ -421,7 +422,7 @@ def get_predictions_matches(ground_truth_annotations, predictions):
             matches_data.append(
                 {
                     "prediction": prediction,
-                    "is_correct": np.any(matches_flags_vector)
+                    "is_correct": bool(np.any(matches_flags_vector))
                 }
             )
 
@@ -477,7 +478,7 @@ class MeanAveragePrecisionComputer:
         """
         Given predictions matches data return recall values and precision values computed up to each prediction
         matches data element
-        :param predictions_matches_data: list of dictionaries with prediction and information whether is matched
+        :param predictions_matches_data: list of dictionaries with prediction and information whether it matched
         a ground truth annotation
         :param ground_truth_annotations_count: int, number of ground truth annotations in dataset
         :return: tuple of two lists, first contains recall values across predictions matches data,
@@ -530,7 +531,7 @@ class MeanAveragePrecisionComputer:
     @staticmethod
     def get_smoothed_out_precision_values(precision_values):
         """
-        Given progressive recall values and precision values for predictions from most to least confident,
+        Given progressive precision values for predictions from most to least confident,
         smooth them out VOC Pascal 2007 style.
         For each precision value replace it with the maximum value to its right.
         :param precision_values: 1D numpy array of floats

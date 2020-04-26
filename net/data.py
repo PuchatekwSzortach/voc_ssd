@@ -239,7 +239,7 @@ class BackgroundDataLoader:
     def __init__(self, data_loader):
         """
         Constructor
-        :param data_loader: data_loader instance which from which data will be loaded in the background
+        :param data_loader: data_loader instance from which data will be loaded in the background
         """
 
         self.data_loader = data_loader
