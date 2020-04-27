@@ -33,12 +33,12 @@ heads, as well as what should be sizes and aspect ratios of default boxes placed
 No changes in code are necessary to adjust network to configuration optimal for a given dataset. 
 
 ### Use of corner boxes instead of center boxes
-Original SSD network defines default boxes in [center_x, center_y, width, height] format.
-This work uses an alternative [min_x, min_y, max_x, max_y] format.
+Original SSD network defines default boxes in `[center_x, center_y, width, height]` format.  
+This work uses an alternative `[min_x, min_y, max_x, max_y]` format.
 Both formats are interchangeable, but the latter is far more popular among computer vision frameworks and easier to work with.
 
 ### Simpler offsets predictions loss
-Offsets losses are just square error losses scaled by boxes sizes, and computed in the same fashion for each box coordinate
+Offsets losses are just square error losses scaled by boxes sizes, and computed in the same fashion for each box coordinate.
 
 ### Network operates on original image resolution
 Original SSD scales images to 300x300 or 500x500 resolution.
@@ -46,17 +46,18 @@ This has several disadvantages, especially for VOC dataset:
 - objects aspect ratios might be distorted - and the distortion factor varies across images 
 - data analysis becomes more difficult, making finding optimal network configuration difficult as well
 - for most VOC images above rescaling decreases image resolution, making small objects, so ones that are particularly hard to detect, even smaller
+
 In this work we choose to train and predict on original image resolution, only adjusting image to a size factor of 32, which simplifies computations of default boxes coordinates.
 This still allows predictions to run above 30 frames per second on GeForce GTX 1080 Ti.
 
 ### Provided scripts
 Following scripts are provided in the `scripts` directory
-- data_analysis.py - analyzes sizes and aspect ratios of annotations in dataset
-- model_analysis.py - analyzes performance of trained model on a dataset
-- networks_configuration_analysis.py - analyzes overlap between neighbouring default boxes defined by network configuration
-- networks_theoretical_bounds_analysis.py - analyzes theoretical recall network with given configuration can achieve on given dataset, reports sizes and aspect ratios of annotations network can't detect
-- train.py - trains network
-- visualize.py - provides routines to visualize raw data, augmented data, predictions, etc
+- `data_analysis.py` - analyzes sizes and aspect ratios of annotations in dataset
+- `model_analysis.py` - analyzes performance of trained model on a dataset
+- `networks_configuration_analysis.py` - analyzes overlap between neighbouring default boxes defined by network configuration
+- `networks_theoretical_bounds_analysis.py` - analyzes theoretical recall network with given configuration can achieve on given dataset, reports sizes and aspect ratios of annotations network can't detect
+- `train.py` - trains network
+- `visualize.py` - provides routines to visualize raw data, augmented data, predictions, etc
 
 Location of data and model paths, training hyperparameters and other inputs for all scripts are controlled through configuration file parameter.
 `config.yaml` provides a sample configuration.
@@ -64,14 +65,14 @@ Location of data and model paths, training hyperparameters and other inputs for 
 ### Using with PASCAL VOC 2012 dataset
 
 Dataset is not included with this repository. Please download dataset from the [official webpage](http://host.robots.ox.ac.uk/pascal/VOC/voc2012/#devkit).
-Once downloaded, adjust config.yaml so its relevant entry points to path with data.
+Once downloaded, adjust config.yaml so its relevant section points to path with data.
 
 A few sample predictions on VOC 2012 dataset made with a trained model are shown below
 
 #### Good prediction
 ![alt text](./images/good_prediction.png)  
 
-#### Average prediction - many objects are correctly detected, but a few are off
+#### Typical prediction - many objects are correctly detected, but a few are off
 ![alt text](./images/typical_prediction.png)  
 
 #### Bad prediction
@@ -81,9 +82,10 @@ A few sample predictions on VOC 2012 dataset made with a trained model are shown
 
 This project can be readily reused with different object detection datasets.
 In most cases the only changes you would need to do are:
-- implement a data loader - look at net.data.VOCSamplesDataLoader for reference
+- implement a data loader - look at `net.data.VOCSamplesDataLoader` for reference
 - adjust configuration file to load data from appropriate path
 
-Of course I would then advise to use tools project provides to define optimal network configuration for your dataset, going through
-data analysis -> network configuration adjustments -> theoretical network performance analysis loop -> training -> model performance analysis loop.
+Of course I would then advise to use tools project provides to define optimal network configuration for your dataset, going through  
+`data analysis -> network configuration adjustments -> theoretical network performance analysis loop -> training -> model performance analysis`  
+loop.
 
