@@ -230,7 +230,8 @@ def log_single_prediction(logger, model, default_boxes_factory, samples_iterator
 
     logger.info(vlogging.VisualRecord(
         "Ground truth vs predictions vs predictions with nms",
-        [ground_truth_annotations_image, predicted_annotations_image, predicted_annotations_image_with_nms]))
+        # [ground_truth_annotations_image, predicted_annotations_image, predicted_annotations_image_with_nms]))
+        [ground_truth_annotations_image, predicted_annotations_image_with_nms]))
 
 
 def log_predictions(logger, config):
