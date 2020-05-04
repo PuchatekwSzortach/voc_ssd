@@ -13,7 +13,7 @@ import net.ssd
 import net.utilities
 
 
-def analyse_theoretical_performance(config):
+def analyse_theoretical_performance(config, ssd_model_configuration):
     """
     Analyse theoretical performance of SSD model on VOC dataset
     """
@@ -25,7 +25,10 @@ def analyse_theoretical_performance(config):
         size_factor=config["size_factor"])
 
     matching_analysis_generator = net.ssd.get_matching_analysis_generator(
-        config["vggish_model_configuration"], iter(voc_samples_loader), threshold=0.5)
+        ssd_model_configuration=ssd_model_configuration,
+        ssd_input_generator=iter(voc_samples_loader),
+        threshold=0.5
+    )
 
     matched_annotations = []
     unmatched_annotations = []
@@ -58,7 +61,9 @@ def main():
     with open(arguments.config) as file:
         config = yaml.safe_load(file)
 
-    analyse_theoretical_performance(config)
+    analyse_theoretical_performance(
+        config=config,
+        ssd_model_configuration=config["vggish_model_configuration"])
 
 
 if __name__ == "__main__":

@@ -15,21 +15,17 @@ import net.ssd
 import net.utilities
 
 
-def get_trained_model(config, model_checkpoint_path):
+def get_trained_model(network, model_checkpoint_path):
     """
     Utility to create SSD model and load its weights
-    :param config: dictionary with configuration parameters
+    :param network: network instance
     :param model_checkpoint_path: str, path to model checkpoint directory
     :return: net.ml.VGGishModel instance
     """
 
-    network = net.ml.VGGishNetwork(
-        model_configuration=config["vggish_model_configuration"],
-        categories_count=len(config["categories"]))
-
     session = tf.keras.backend.get_session()
 
-    model = net.ml.VGGishModel(session, network)
+    model = net.ml.SSDModel(session, network)
     model.load(model_checkpoint_path)
 
     return model
@@ -48,7 +44,15 @@ def main():
     with open(arguments.config) as file:
         config = yaml.safe_load(file)
 
-    model = get_trained_model(config, model_checkpoint_path=config["model_checkpoint_path"])
+    ssd_model_configuration = config["vggish_model_configuration"]
+
+    network = net.ml.VGGishNetwork(
+        model_configuration=ssd_model_configuration,
+        categories_count=len(config["categories"]))
+
+    model = get_trained_model(
+        network=network,
+        model_checkpoint_path=config["model_checkpoint_path"])
 
     validation_samples_loader = net.data.VOCSamplesDataLoader(
         data_directory=config["voc"]["data_directory"],
@@ -58,7 +62,7 @@ def main():
 
     logger = net.utilities.get_logger(config["log_path"])
 
-    default_boxes_factory = net.ssd.DefaultBoxesFactory(model_configuration=config["vggish_model_configuration"])
+    default_boxes_factory = net.ssd.DefaultBoxesFactory(model_configuration=ssd_model_configuration)
 
     thresholds_matching_data_map = net.analysis.MatchingDataComputer(
         samples_loader=validation_samples_loader,
@@ -77,7 +81,7 @@ def main():
 
     losses_map = net.analysis.get_mean_losses(
         model=model,
-        ssd_model_configuration=config["vggish_model_configuration"],
+        ssd_model_configuration=ssd_model_configuration,
         samples_loader=validation_samples_loader)
 
     logger.info("<br><h2>Losses map: {}</h2><br>".format(losses_map))

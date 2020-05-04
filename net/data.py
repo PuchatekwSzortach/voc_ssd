@@ -169,6 +169,12 @@ class VOCSamplesDataLoader:
                     image, resized_bounding_boxes = net.utilities.get_resized_sample(
                         image, bounding_boxes, size_factor=self.size_factor)
 
+                    # Pad image to a multiple of size factor on right and bottom side
+                    image = net.utilities.get_image_padded_to_size_factor_multiple(
+                        image=image,
+                        size_factor=self.size_factor
+                    )
+
                     for index, bounding_box in enumerate(resized_bounding_boxes):
                         annotations[index].bounding_box = bounding_box
 
@@ -271,7 +277,8 @@ def get_image_augmentation_pipeline():
             imgaug.augmenters.SomeOf(
                 n=(0, None),
                 children=[
-                    imgaug.augmenters.Grayscale(alpha=(0.2, 1))
+                    imgaug.augmenters.Grayscale(alpha=(0.2, 1)),
+                    imgaug.augmenters.Affine(scale={"x": (0.8, 1.2), "y": (0.8, 1.2)})
                 ],
                 random_order=True),
             # Left-right flip

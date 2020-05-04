@@ -558,3 +558,28 @@ def get_detections_after_soft_non_maximum_suppression(detections, sigma, score_t
         detections = detections[retained_detections_indices]
 
     return np.array(retained_detections)
+
+
+def get_image_padded_to_size_factor_multiple(image, size_factor):
+    """
+    Pad image so its width and height are a multiple of size_factor.
+    Padding, if necessary, is done on the right and bottom side of the image only.
+    Padded pixels are set to padding_color.
+    :param image: 3D numpy array
+    :param size_factor: int, multiple to which image should be padded
+    :return: 3D numpy array, padded image
+    """
+
+    bottom_padding = size_factor - (image.shape[0] % size_factor) if (image.shape[0] % size_factor) != 0 else 0
+    right_padding = size_factor - (image.shape[1] % size_factor) if (image.shape[1] % size_factor) != 0 else 0
+
+    padding = [(0, bottom_padding), (0, right_padding), (0, 0)]
+
+    padded_image = np.pad(
+        array=image,
+        pad_width=padding,
+        mode="constant",
+        constant_values=0
+    )
+
+    return padded_image

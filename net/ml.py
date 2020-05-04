@@ -12,30 +12,28 @@ import tqdm
 import net.ssd
 
 
-class VGGishNetwork:
+class BaseSSDNetwork:
     """
-    SSD model based on VGG
+    Base abstract class for SSD network.
+    Provides logic for building prediction heads, but expects subclasses to provide code
+    that will select base layers for prediction heads
     """
 
     def __init__(self, model_configuration, categories_count):
         """
-        Constructor
-        :param model_configuration: dictionary with model configuration
-        :param categories_count: number of categories to predict, including background
+        Constructor, build a prediction network based on data expected to be provided by subclasses
+        :param model_configuration: dictionary with model configuration options
+        :param categories_count: int, number of output categories
         """
 
         self.model_configuration = model_configuration
 
-        vgg = tf.keras.applications.VGG16(include_top=False)
+        # Subclass should provide implementation of ops map
+        base_layers_tensor_map = self.get_base_layers_tensors_map()
 
-        self.input_placeholder = vgg.input
+        self.input_placeholder = base_layers_tensor_map["input_placeholder"]
 
-        ops_map = {
-            "block2_head": vgg.get_layer("block2_pool").output,
-            "block3_head": vgg.get_layer("block3_pool").output,
-            "block4_head": vgg.get_layer("block4_pool").output,
-            "block5_head": vgg.get_layer("block5_pool").output,
-        }
+        self.ops_map = base_layers_tensor_map
 
         categories_predictions_heads_ops_list = []
         offset_predictions_heads_ops_list = []
@@ -43,7 +41,7 @@ class VGGishNetwork:
         for block in model_configuration["prediction_heads_order"]:
 
             categories_predictions_head, offsets_predictions_head = self.get_predictions_head(
-                input_op=ops_map[block],
+                input_op=base_layers_tensor_map[block],
                 categories_count=categories_count,
                 head_configuration=model_configuration[block])
 
@@ -99,10 +97,88 @@ class VGGishNetwork:
             tf.reshape(offsets_predictions_op,
                        shape=(tf.shape(offsets_predictions_op)[0], -1, 4))
 
+    def get_base_layers_tensors_map(self):
+        """
+        Hook for subclasses to provide base layers map.
+        It should contain input placeholder tensor, as well as a tensor for every prediction head
+        that network's configuration specifies
+        :return: dictionary
+        """
 
-class VGGishModel:
+        raise NotImplementedError()
+
+
+class VGGishNetwork(BaseSSDNetwork):
     """
-    Class that wraps VGGish network to provide training and prediction methods
+    SSD model based on VGG
+    """
+
+    def __init__(self, model_configuration, categories_count):
+        """
+        Constructor
+        :param model_configuration: dictionary with model configuration
+        :param categories_count: number of categories to predict, including background
+        """
+
+        super().__init__(
+            model_configuration=model_configuration,
+            categories_count=categories_count
+        )
+
+    def get_base_layers_tensors_map(self):
+        """
+        Implementation of hook for base layers tensors.
+        Provides an input placeholder tensor and tensors for bases of prediction heads
+        :return: dictionary
+        """
+
+        network = tf.keras.applications.VGG16(include_top=False)
+
+        tensors_map = {prediction_head: network.get_layer(prediction_head).output
+                       for prediction_head in self.model_configuration["prediction_heads_order"]}
+
+        tensors_map["input_placeholder"] = network.input
+
+        return tensors_map
+
+
+class Resnet50ishNetwork(BaseSSDNetwork):
+    """
+    SSD model based on Resnet50 network
+    """
+
+    def __init__(self, model_configuration, categories_count):
+        """
+        Constructor
+        :param model_configuration: dictionary with model configuration
+        :param categories_count: number of categories to predict, including background
+        """
+
+        super().__init__(
+            model_configuration=model_configuration,
+            categories_count=categories_count
+        )
+
+    def get_base_layers_tensors_map(self):
+        """
+        Implementation of hook for base layers tensors.
+        Provides an input placeholder tensor and tensors for bases of prediction heads
+        :return: dictionary
+        """
+
+        network = tf.keras.applications.ResNet50(include_top=False)
+
+        tensors_map = {prediction_head: network.get_layer(prediction_head).output
+                       for prediction_head in self.model_configuration["prediction_heads_order"]}
+
+        tensors_map["input_placeholder"] = network.input
+
+        return tensors_map
+
+
+class SSDModel:
+    """
+    Class that wraps SSD network to provide training and prediction methods
     """
 
     def __init__(self, session, network):

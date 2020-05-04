@@ -202,25 +202,12 @@ def log_single_prediction(logger, model, default_boxes_factory, samples_iterator
 
     default_boxes_matrix = default_boxes_factory.get_default_boxes_matrix(image.shape)
 
-    predictions = net.ssd.PredictionsComputer(
-        categories=config["categories"],
-        threshold=0.5,
-        use_non_maximum_suppression=False).get_predictions(
-            bounding_boxes_matrix=default_boxes_matrix + offsets_predictions_matrix,
-            softmax_predictions_matrix=softmax_predictions_matrix)
-
     predictions_with_nms = net.ssd.PredictionsComputer(
         categories=config["categories"],
         threshold=0.5,
         use_non_maximum_suppression=True).get_predictions(
             bounding_boxes_matrix=default_boxes_matrix + offsets_predictions_matrix,
             softmax_predictions_matrix=softmax_predictions_matrix)
-
-    predicted_annotations_image = net.plot.get_annotated_image(
-        image=net.data.ImageProcessor.get_denormalized_image(image),
-        annotations=predictions,
-        colors=[(0, 255, 0)] * len(predictions),
-        font_path=config["font_path"])
 
     predicted_annotations_image_with_nms = net.plot.get_annotated_image(
         image=net.data.ImageProcessor.get_denormalized_image(image),
@@ -230,7 +217,6 @@ def log_single_prediction(logger, model, default_boxes_factory, samples_iterator
 
     logger.info(vlogging.VisualRecord(
         "Ground truth vs predictions vs predictions with nms",
-        # [ground_truth_annotations_image, predicted_annotations_image, predicted_annotations_image_with_nms]))
         [ground_truth_annotations_image, predicted_annotations_image_with_nms]))
 
 
@@ -247,7 +233,7 @@ def log_predictions(logger, config):
 
     session = tf.keras.backend.get_session()
 
-    model = net.ml.VGGishModel(session, network)
+    model = net.ml.SSDModel(session, network)
     model.load(config["model_checkpoint_path"])
 
     validation_samples_loader = net.data.VOCSamplesDataLoader(
@@ -368,7 +354,7 @@ def log_debugging_info(logger, config):
 
     session = tf.keras.backend.get_session()
 
-    model = net.ml.VGGishModel(session, network)
+    model = net.ml.SSDModel(session, network)
     model.load(config["model_checkpoint_path"])
 
     validation_samples_loader = net.data.VOCSamplesDataLoader(
@@ -445,10 +431,10 @@ def main():
 
     logger = net.utilities.get_logger(config["log_path"])
 
-    # log_voc_samples_generator_output(logger, config)
+    log_voc_samples_generator_output(logger, config)
     # log_default_boxes_matches(logger, config)
     # log_ssd_training_loop_data_loader_outputs(logger, config)
-    log_predictions(logger, config)
+    # log_predictions(logger, config)
     # log_debugging_info(logger, config)
     # log_augmentations(logger, config)
 
