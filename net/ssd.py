@@ -380,7 +380,7 @@ def get_single_shot_detector_loss_op(
     # Otherwise return 0 - as we can't have a mean of an empty op.
     return tf.cond(
         pred=positive_matches_count_op > 0,
-        true_fn=lambda: tf.reduce_mean(tf.concat([positive_losses_op, negative_losses_op], axis=0)),
+        true_fn=lambda: tf.math.reduce_mean(tf.concat(values=[positive_losses_op, negative_losses_op], axis=0)),
         false_fn=lambda: tf.constant(0, dtype=tf.float32))
 
 
@@ -464,7 +464,7 @@ class SingleShotDetectorLossBuilder:
         # Otherwise return 0 - as we can't have a mean of an empty op.
         return tf.cond(
             pred=positive_matches_count_op > 0,
-            true_fn=lambda: tf.reduce_mean(tf.concat([positive_losses_op, negative_losses_op], axis=0)),
+            true_fn=lambda: tf.math.reduce_mean(tf.concat(values=[positive_losses_op, negative_losses_op], axis=0)),
             false_fn=lambda: tf.constant(0, dtype=tf.float32))
 
     def _build_offsets_loss(self, positive_matches_selector_op, positive_matches_count_op):
