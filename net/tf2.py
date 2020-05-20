@@ -2,6 +2,8 @@
 Code with tensorflow 2.x code
 """
 
+import copy
+
 import numpy as np
 import tensorflow as tf
 
@@ -103,7 +105,7 @@ class BaseSSDNetwork:
         )
 
         self.model.compile(
-            optimizer='adam',
+            optimizer=tf.keras.optimizers.Adam(learning_rate=0.00001),
             loss={
                 "categories_predictions_head": categories_predictions_loss,
                 "offsets_predictions_head": offsets_predictions_loss
@@ -159,6 +161,19 @@ class BaseSSDNetwork:
         """
 
         raise NotImplementedError()
+
+    def predict(self, image):
+        """
+        Computes prediction on a single image
+        :param image: 3D numpy array representing an image
+        :return: 2 elements tuple,
+        (2D numpy array with softmax_predictions_matrix, 2D numpy array with offsets predictions)
+        """
+
+        images_batch_op = tf.constant(np.array([image]))
+        outputs = self.model.predict(images_batch_op)
+
+        return outputs["categories_predictions_head"][0], outputs["offsets_predictions_head"][0]
 
 
 class VGGishNetwork(BaseSSDNetwork):
@@ -323,4 +338,7 @@ class HistoryLogger(tf.keras.callbacks.Callback):
         Callback called on epoch end
         """
 
-        self.logger.info(logs)
+        local_logs = copy.deepcopy(logs)
+        local_logs["epoch"] = epoch
+
+        self.logger.info(local_logs)

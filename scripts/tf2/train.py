@@ -66,12 +66,17 @@ def main():
 
     callbacks = [
         tf.keras.callbacks.ModelCheckpoint(
-            filepath=config["model_checkpoint_path"]),
+            filepath=config["model_checkpoint_path"],
+            save_best_only=True,
+            save_weights_only=True,
+            verbose=1),
         tf.keras.callbacks.EarlyStopping(
-            patience=config["train"]["early_stopping_patience"]),
+            patience=config["train"]["early_stopping_patience"],
+            verbose=1),
         tf.keras.callbacks.ReduceLROnPlateau(
             patience=config["train"]["reduce_learning_rate_patience"],
-            factor=config["train"]["reduce_learning_rate_factor"]),
+            factor=config["train"]["reduce_learning_rate_factor"],
+            verbose=1),
         net.tf2.HistoryLogger(
             logger=net.utilities.get_logger(config["training_history_log_path"])
         )
