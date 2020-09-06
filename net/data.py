@@ -124,12 +124,39 @@ class VOCSamplesDataLoader:
         """
 
         self.data_directory = data_directory
-        self.images_filenames = get_dataset_filenames(data_directory, data_set_path)
-
         self.labels_to_categories_index_map = {label: index for (index, label) in enumerate(categories)}
+
+        raw_images_filenames = get_dataset_filenames(data_directory, data_set_path)
+
+        # For training data upsample number of selected images in each batch
+        self.images_filenames = self._get_upsampled_images_filenames(
+            images_filenames=raw_images_filenames) if augmentation_pipeline is not None else raw_images_filenames
 
         self.size_factor = size_factor
         self.augmentation_pipeline = augmentation_pipeline
+
+    def _get_upsampled_images_filenames(self, images_filenames):
+
+        upsampled_images_filenames = []
+
+        for image_filename in images_filenames:
+
+            annotations_path = os.path.join(self.data_directory, "Annotations", image_filename + ".xml")
+
+            with open(annotations_path) as file:
+                image_annotations = xmltodict.parse(file.read())
+
+            annotations = get_objects_annotations(image_annotations, self.labels_to_categories_index_map)
+
+            smallest_annotation_height = min([annotation.height for annotation in annotations])
+            smallest_annotation_width = min([annotation.width for annotation in annotations])
+
+            if smallest_annotation_height < 100 or smallest_annotation_width < 100:
+
+                # Upsample number of times this image is in images filenames
+                upsampled_images_filenames.extend([image_filename] * 3)
+
+        return images_filenames + upsampled_images_filenames
 
     def __len__(self):
 
