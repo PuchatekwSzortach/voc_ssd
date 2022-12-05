@@ -1,3 +1,7 @@
+common_parameters:
+  base_data_directory_on_host: "../../data"
+  logging_output_directory_on_host: "/tmp/voc_ssd"
+
 voc:
   data_directory: "../../data/VOC2012"
   train_set_path: "ImageSets/Main/train.txt"
@@ -55,6 +59,7 @@ vggish_model_configuration:
     image_downscale_factor: 32
     base_bounding_box_sizes: [150, 200, 300, 400, 500]
     aspect_ratios: [0.4, 0.6, 0.8, 1]
+
 
 resnetish_model_configuration:
   prediction_heads_order: ["res2c_branch2c", "res3b_branch2c", "res4b_branch2c", "res5b_branch2c"]

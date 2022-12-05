@@ -135,7 +135,11 @@ disable=print-statement,
         no-else-return,
         no-self-use,
         no-member,
-        logging-format-interpolation
+        logging-format-interpolation,
+        # Unfortunately pylint doesn't work correctly with tensorflow 2.x at the time of this writing
+        unexpected-keyword-arg,
+        no-value-for-parameter
+
 
 # Enable the message, report, category or checker with the given id(s). You can
 # either give multiple identifier separated by comma (,) or put this option
