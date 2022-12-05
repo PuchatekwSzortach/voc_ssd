@@ -1,3 +1,7 @@
+common_parameters:
+  base_data_directory_on_host: "../../data"
+  logging_output_directory_on_host: "/tmp/voc_ssd"
+
 voc:
   data_directory: "../../data/VOC2012"
   train_set_path: "ImageSets/Main/train.txt"
