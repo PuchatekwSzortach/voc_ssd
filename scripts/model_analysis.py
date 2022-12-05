@@ -5,30 +5,14 @@ Script with model analysis
 import argparse
 import sys
 
-import tensorflow as tf
 import yaml
 
 import net.analysis
 import net.data
 import net.ml
 import net.ssd
+import net.tf2
 import net.utilities
-
-
-def get_trained_model(network, model_checkpoint_path):
-    """
-    Utility to create SSD model and load its weights
-    :param network: network instance
-    :param model_checkpoint_path: str, path to model checkpoint directory
-    :return: net.ml.VGGishModel instance
-    """
-
-    session = tf.keras.backend.get_session()
-
-    model = net.ml.SSDModel(session, network)
-    model.load(model_checkpoint_path)
-
-    return model
 
 
 def main():
@@ -46,13 +30,11 @@ def main():
 
     ssd_model_configuration = config["vggish_model_configuration"]
 
-    network = net.ml.VGGishNetwork(
+    network = net.tf2.VGGishNetwork(
         model_configuration=ssd_model_configuration,
         categories_count=len(config["categories"]))
 
-    model = get_trained_model(
-        network=network,
-        model_checkpoint_path=config["model_checkpoint_path"])
+    network.model.load_weights(config["model_checkpoint_path"])
 
     validation_samples_loader = net.data.VOCSamplesDataLoader(
         data_directory=config["voc"]["data_directory"],
@@ -66,7 +48,7 @@ def main():
 
     thresholds_matching_data_map = net.analysis.MatchingDataComputer(
         samples_loader=validation_samples_loader,
-        model=model,
+        model=network,
         default_boxes_factory=default_boxes_factory,
         thresholds=[0, 0.5, 0.9],
         categories=config["categories"]).get_thresholds_matched_data_map()
@@ -79,12 +61,12 @@ def main():
         logger=logger,
         thresholds_matching_data_map=thresholds_matching_data_map)
 
-    losses_map = net.analysis.get_mean_losses(
-        model=model,
-        ssd_model_configuration=ssd_model_configuration,
-        samples_loader=validation_samples_loader)
+    # losses_map = net.analysis.get_mean_losses(
+    #     model=network,
+    #     ssd_model_configuration=ssd_model_configuration,
+    #     samples_loader=validation_samples_loader)
 
-    logger.info("<br><h2>Losses map: {}</h2><br>".format(losses_map))
+    # logger.info("<br><h2>Losses map: {}</h2><br>".format(losses_map))
 
     net.analysis.log_performance_with_annotations_size_analysis(
         logger=logger,
