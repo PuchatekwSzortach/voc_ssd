@@ -1,0 +1,30 @@
+name: Continuous integration
+on: [push]
+
+jobs:
+  run_inserts_count_check:
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+        with:
+          python-version: '3.6.9'
+      - name: install dependencies
+        run: |
+          pip install invoke gitpython
+      - name: run inserts count check
+        run: invoke tests.inserts-count-check
+
+  run_commit_stage_in_container:
+    runs-on: ubuntu-20.04
+    container:
+      image: tensorflow/tensorflow:2.9.1-gpu
+    steps:
+      - uses: actions/checkout@v2
+      - name: install dependencies
+        run: |
+          apt update && apt install -y libcairo2-dev  libgl1 && pip install -r requirements.txt
+      - name: run unit tests
+        run: invoke tests.unit-tests
+      - name: run static code analysis
+        run: invoke tests.static-code-analysis
