@@ -21,7 +21,7 @@ def analyze_data(_context, config_path):
     import net.analysis
     import net.utilities
 
-    with open(config_path) as file:
+    with open(config_path, encoding="utf-8") as file:
         config = yaml.safe_load(file)
 
     annotations = net.analysis.get_filtered_dataset_annotations(config)
@@ -47,7 +47,7 @@ def analyze_network_theoretical_bounds(_context, config_path):
     import net.ssd
     import net.utilities
 
-    with open(config_path) as file:
+    with open(config_path, encoding="utf-8") as file:
         config = yaml.safe_load(file)
 
     ssd_model_configuration = config["vggish_model_configuration"]
@@ -98,7 +98,7 @@ def analyze_network_configuration(_context, config_path):
 
     import net.utilities
 
-    with open(config_path) as file:
+    with open(config_path, encoding="utf-8") as file:
         config = yaml.safe_load(file)
 
     model_configuration = config["vggish_model_configuration"]
@@ -156,7 +156,7 @@ def analyze_objects_detections_predictions(_context, config_path):
     import net.data
     import net.tf2
 
-    with open(config_path) as file:
+    with open(config_path, encoding="utf-8") as file:
         config = yaml.safe_load(file)
 
         ssd_model_configuration = config["vggish_model_configuration"]
@@ -191,13 +191,6 @@ def analyze_objects_detections_predictions(_context, config_path):
     net.analysis.log_mean_average_precision_analysis(
         logger=logger,
         thresholds_matching_data_map=thresholds_matching_data_map)
-
-    # losses_map = net.analysis.get_mean_losses(
-    #     model=network,
-    #     ssd_model_configuration=ssd_model_configuration,
-    #     samples_loader=validation_samples_loader)
-
-    # logger.info("<br><h2>Losses map: {}</h2><br>".format(losses_map))
 
     net.analysis.log_performance_with_annotations_size_analysis(
         logger=logger,

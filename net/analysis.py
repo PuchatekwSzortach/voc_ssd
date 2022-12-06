@@ -19,7 +19,6 @@ import net.ssd
 import net.utilities
 
 
-
 def get_filtered_dataset_annotations(config):
     """
     Retrieves annotations for the dataset, scales them in accordance to how their images would be scaled
@@ -40,7 +39,7 @@ def get_filtered_dataset_annotations(config):
 
     for annotations_path in tqdm.tqdm(annotations_paths):
 
-        with open(annotations_path) as file:
+        with open(annotations_path, encoding="utf-8") as file:
 
             image_annotations_xml = xmltodict.parse(file.read())
 
@@ -59,7 +58,6 @@ def get_filtered_dataset_annotations(config):
             all_annotations.extend(annotations)
 
     return all_annotations
-
 
 
 def is_annotation_matched(annotation, match_candidates):

@@ -25,7 +25,7 @@ def get_dataset_filenames(data_directory, data_set_path):
     :return: list of strings, filenames of images used in dataset
     """
 
-    with open(os.path.join(data_directory, data_set_path)) as file:
+    with open(os.path.join(data_directory, data_set_path), encoding="utf-8") as file:
 
         return [line.strip() for line in file.readlines()]
 
@@ -143,13 +143,13 @@ class VOCSamplesDataLoader:
 
             annotations_path = os.path.join(self.data_directory, "Annotations", image_filename + ".xml")
 
-            with open(annotations_path) as file:
+            with open(annotations_path, encoding="utf-8") as file:
                 image_annotations = xmltodict.parse(file.read())
 
             annotations = get_objects_annotations(image_annotations, self.labels_to_categories_index_map)
 
-            smallest_annotation_height = min([annotation.height for annotation in annotations])
-            smallest_annotation_width = min([annotation.width for annotation in annotations])
+            smallest_annotation_height = min(annotation.height for annotation in annotations)
+            smallest_annotation_width = min(annotation.width for annotation in annotations)
 
             if smallest_annotation_height < 100 or smallest_annotation_width < 100:
 
@@ -174,7 +174,7 @@ class VOCSamplesDataLoader:
 
                 annotations_path = os.path.join(self.data_directory, "Annotations", image_filename + ".xml")
 
-                with open(annotations_path) as file:
+                with open(annotations_path, encoding="utf-8") as file:
 
                     image_annotations = xmltodict.parse(file.read())
 
