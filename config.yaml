@@ -35,7 +35,7 @@ categories:
     'train',
     'tvmonitor']
 
-font_path: "/usr/share/fonts/truetype/msttcorefonts/arial.ttf"
+font_path: "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
 
 # Size factor to which images should be rescaled
 size_factor: 32

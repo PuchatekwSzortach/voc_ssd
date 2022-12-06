@@ -3,6 +3,7 @@ Script with analysis code
 """
 
 import collections
+import os
 import queue
 import threading
 
@@ -11,9 +12,54 @@ import numpy as np
 import seaborn
 import tqdm
 import vlogging
+import xmltodict
 
+import net.data
 import net.ssd
 import net.utilities
+
+
+
+def get_filtered_dataset_annotations(config):
+    """
+    Retrieves annotations for the dataset, scales them in accordance to how their images would be scaled
+    in prediction, filters out unusually sized annotations, then returns annotations that made it through filtering
+    :param config: configuration dictionary
+    :return: list of net.utilities.Annotation instances
+    """
+
+    images_filenames = net.data.get_dataset_filenames(
+        config["voc"]["data_directory"], config["voc"]["validation_set_path"])
+
+    annotations_paths = [os.path.join(config["voc"]["data_directory"], "Annotations", image_filename + ".xml")
+                         for image_filename in images_filenames]
+
+    labels_to_categories_index_map = {label: index for (index, label) in enumerate(config["categories"])}
+
+    all_annotations = []
+
+    for annotations_path in tqdm.tqdm(annotations_paths):
+
+        with open(annotations_path) as file:
+
+            image_annotations_xml = xmltodict.parse(file.read())
+
+            image_size = \
+                int(image_annotations_xml["annotation"]["size"]["height"]), \
+                int(image_annotations_xml["annotation"]["size"]["width"])
+
+            # Read annotations
+            annotations = net.data.get_objects_annotations(
+                image_annotations=image_annotations_xml,
+                labels_to_categories_index_map=labels_to_categories_index_map)
+
+            # Resize annotations in line with how we would resize the image
+            annotations = [annotation.resize(image_size, config["size_factor"]) for annotation in annotations]
+
+            all_annotations.extend(annotations)
+
+    return all_annotations
+
 
 
 def is_annotation_matched(annotation, match_candidates):
