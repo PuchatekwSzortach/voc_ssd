@@ -23,19 +23,17 @@ def log_voc_samples_generator_output(_context, config_path):
     import net.plot
     import net.utilities
 
-    with open(config_path) as file:
+    with open(config_path, encoding="utf-8") as file:
         config = yaml.safe_load(file)
 
     logger = net.utilities.get_logger(config["log_path"])
 
-    samples_loader = net.data.VOCSamplesDataLoader(
+    generator = iter(net.data.VOCSamplesDataLoader(
         data_directory=config["voc"]["data_directory"],
         data_set_path=config["voc"]["validation_set_path"],
         categories=config["categories"],
         size_factor=config["size_factor"],
-        augmentation_pipeline=net.data.get_image_augmentation_pipeline())
-
-    generator = iter(samples_loader)
+        augmentation_pipeline=net.data.get_image_augmentation_pipeline()))
 
     categories_to_colors_map = net.utilities.get_categories_to_colors_map(config["categories"])
 
@@ -43,12 +41,10 @@ def log_voc_samples_generator_output(_context, config_path):
 
         image, annotations = next(generator)
 
-        colors = [categories_to_colors_map[annotation.label] for annotation in annotations]
-
         image = net.plot.get_annotated_image(
             image=net.data.ImageProcessor.get_denormalized_image(image),
             annotations=annotations,
-            colors=colors,
+            colors=[categories_to_colors_map[annotation.label] for annotation in annotations],
             draw_labels=True,
             font_path=config["font_path"])
 
@@ -76,7 +72,7 @@ def log_default_boxes_matches(_context, config_path):
     import net.ssd
     import net.utilities
 
-    with open(config_path) as file:
+    with open(config_path, encoding="utf-8") as file:
         config = yaml.safe_load(file)
 
     logger = net.utilities.get_logger(config["log_path"])
@@ -115,24 +111,20 @@ def log_ssd_training_loop_data_loader_outputs(_context, config_path):
     import net.ssd
     import net.utilities
 
-    with open(config_path) as file:
+    with open(config_path, encoding="utf-8") as file:
         config = yaml.safe_load(file)
 
     logger = net.utilities.get_logger(config["log_path"])
 
-    samples_loader = net.data.VOCSamplesDataLoader(
-        data_directory=config["voc"]["data_directory"],
-        data_set_path=config["voc"]["validation_set_path"],
-        categories=config["categories"],
-        size_factor=config["size_factor"])
-
-    ssd_validation_samples_loader = net.ssd.SSDTrainingLoopDataLoader(
-        voc_samples_data_loader=samples_loader,
-        ssd_model_configuration=config["vggish_model_configuration"])
+    iterator = iter(net.ssd.SSDTrainingLoopDataLoader(
+        voc_samples_data_loader=net.data.VOCSamplesDataLoader(
+            data_directory=config["voc"]["data_directory"],
+            data_set_path=config["voc"]["validation_set_path"],
+            categories=config["categories"],
+            size_factor=config["size_factor"]),
+        ssd_model_configuration=config["vggish_model_configuration"]))
 
     default_boxes_factory = net.ssd.DefaultBoxesFactory(config["vggish_model_configuration"])
-
-    iterator = iter(ssd_validation_samples_loader)
 
     for _ in tqdm.tqdm(range(20)):
 
@@ -171,7 +163,7 @@ def log_predictions(_context, config_path):
     import net.tf2
     import net.utilities
 
-    with open(config_path) as file:
+    with open(config_path, encoding="utf-8") as file:
         config = yaml.safe_load(file)
 
     logger = net.utilities.get_logger(config["log_path"])
@@ -220,7 +212,7 @@ def log_debugging_info(_context, config_path):
     import net.tf2
     import net.utilities
 
-    with open(config_path) as file:
+    with open(config_path, encoding="utf-8") as file:
         config = yaml.safe_load(file)
 
     logger = net.utilities.get_logger(config["log_path"])
@@ -231,14 +223,14 @@ def log_debugging_info(_context, config_path):
 
     network.model.load_weights(config["model_checkpoint_path"])
 
-    validation_samples_loader = net.data.VOCSamplesDataLoader(
+    iterator = iter(net.data.VOCSamplesDataLoader(
         data_directory=config["voc"]["data_directory"],
         data_set_path=config["voc"]["train_set_path"],
         categories=config["categories"],
-        size_factor=config["size_factor"])
+        size_factor=config["size_factor"]))
 
-    default_boxes_factory = net.ssd.DefaultBoxesFactory(model_configuration=config["vggish_model_configuration"])
-    iterator = iter(validation_samples_loader)
+    default_boxes_factory = net.ssd.DefaultBoxesFactory(
+        model_configuration=config["vggish_model_configuration"])
 
     for _ in tqdm.tqdm(range(20)):
 
@@ -248,7 +240,6 @@ def log_debugging_info(_context, config_path):
             default_boxes_factory=default_boxes_factory,
             samples_iterator=iterator,
             config=config)
-
 
 
 @invoke.task
@@ -266,45 +257,44 @@ def log_augmentations(_context, config_path):
     import yaml
 
     import net.data
-    import net.logging
     import net.plot
-    import net.ssd
-    import net.tf2
     import net.utilities
 
-    with open(config_path) as file:
+    with open(config_path, encoding="utf-8") as file:
         config = yaml.safe_load(file)
 
     logger = net.utilities.get_logger(config["log_path"])
 
-    validation_samples_loader = net.data.VOCSamplesDataLoader(
+    iterator = iter(net.data.VOCSamplesDataLoader(
         data_directory=config["voc"]["data_directory"],
         data_set_path=config["voc"]["train_set_path"],
         categories=config["categories"],
-        size_factor=config["size_factor"])
+        size_factor=config["size_factor"]))
 
     augmentation_pipeline = net.data.get_image_augmentation_pipeline()
-
-    iterator = iter(validation_samples_loader)
 
     for _ in tqdm.tqdm(range(10)):
 
         image, annotations = next(iterator)
         image = net.data.ImageProcessor.get_denormalized_image(image)
 
-        annotated_image = net.plot.get_annotated_image(
-            image=image,
-            annotations=annotations,
-            colors=[(255, 0, 0)] * len(annotations),
-            draw_labels=False)
-
         augmented_image, augmented_annotations = net.data.get_augmented_sample(
             image=image, annotations=annotations, augmentation_pipeline=augmentation_pipeline)
 
-        augmented_annotated_image = net.plot.get_annotated_image(
-            image=augmented_image,
-            annotations=augmented_annotations,
-            colors=[(255, 0, 0)] * len(augmented_annotations),
-            draw_labels=False)
-
-        logger.info(vlogging.VisualRecord("sample", [annotated_image, augmented_annotated_image]))
+        logger.info(
+            vlogging.VisualRecord(
+                "sample",
+                imgs=[
+                    net.plot.get_annotated_image(
+                        image=image,
+                        annotations=annotations,
+                        colors=[(255, 0, 0)] * len(annotations),
+                        draw_labels=False),
+                    net.plot.get_annotated_image(
+                        image=augmented_image,
+                        annotations=augmented_annotations,
+                        colors=[(255, 0, 0)] * len(augmented_annotations),
+                        draw_labels=False)
+                ]
+            )
+        )

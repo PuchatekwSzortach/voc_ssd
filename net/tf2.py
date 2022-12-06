@@ -281,12 +281,11 @@ def offsets_predictions_loss(labels_data, predictions_data):
 
     default_boxes_count = tf.shape(labels_data_matrix)[0]
 
-    all_ones_op = tf.ones(shape=(default_boxes_count,), dtype=tf.float32)
-    all_zeros_op = tf.zeros(shape=(default_boxes_count,), dtype=tf.float32)
-
     # Get a selector that's set to 1 where for all positive losses, split positive losses and negatives losses
     positive_matches_selector_op = tf.where(
-        default_boxes_categories_ids_vector_op > 0, all_ones_op, all_zeros_op)
+        default_boxes_categories_ids_vector_op > 0,
+        tf.ones(shape=(default_boxes_count,), dtype=tf.float32),
+        tf.zeros(shape=(default_boxes_count,), dtype=tf.float32))
 
     positive_matches_count_op = tf.cast(tf.reduce_sum(positive_matches_selector_op), tf.int32)
 

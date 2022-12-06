@@ -22,8 +22,7 @@ def train_object_detection_model(_context, config_path):
     import net.ssd
     import net.tf2
 
-
-    with open(config_path) as file:
+    with open(config_path, encoding="utf-8") as file:
         config = yaml.safe_load(file)
 
     ssd_model_configuration = config["vggish_model_configuration"]
