@@ -1,31 +1,29 @@
 """
-Training script for tf2 code
+Module with machine learning models training code
 """
 
-import argparse
-import sys
-
-import tensorflow as tf
-import yaml
-
-import net.callbacks
-import net.data
-import net.ssd
-import net.utilities
-import net.tf2
+import invoke
 
 
-def main():
+@invoke.task
+def train_object_detection_model(_context, config_path):
     """
-    Script entry point
+    Train object detection model
+
+    Args:
+        _context (invoke.Context): context instance
+        config_path (str): path to configuration file
     """
 
-    parser = argparse.ArgumentParser()
+    import tensorflow as tf
+    import yaml
 
-    parser.add_argument('--config', action="store", required=True)
-    arguments = parser.parse_args(sys.argv[1:])
+    import net.data
+    import net.ssd
+    import net.tf2
 
-    with open(arguments.config) as file:
+
+    with open(config_path) as file:
         config = yaml.safe_load(file)
 
     ssd_model_configuration = config["vggish_model_configuration"]
@@ -90,8 +88,3 @@ def main():
         validation_steps=len(t2_validation_samples_loader),
         callbacks=callbacks
     )
-
-
-if __name__ == "__main__":
-
-    main()
