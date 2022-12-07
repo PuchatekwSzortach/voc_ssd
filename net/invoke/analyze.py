@@ -154,14 +154,14 @@ def analyze_objects_detections_predictions(_context, config_path):
 
     import net.analysis
     import net.data
-    import net.tf2
+    import net.ml
 
     with open(config_path, encoding="utf-8") as file:
         config = yaml.safe_load(file)
 
         ssd_model_configuration = config["vggish_model_configuration"]
 
-    network = net.tf2.VGGishNetwork(
+    network = net.ml.VGGishNetwork(
         model_configuration=ssd_model_configuration,
         categories_count=len(config["categories"]))
 

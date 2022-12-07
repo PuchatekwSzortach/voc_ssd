@@ -1,15 +1,50 @@
 """
-Module with machine learning code
+Code with tensorflow 2.x code
 """
 
-import os
-import pprint
+import copy
 
 import numpy as np
 import tensorflow as tf
-import tqdm
 
-import net.ssd
+
+class TF2TrainingLoopDataLoader:
+    """
+    Data loader for tensorflow 2.x based code
+    """
+
+    def __init__(self, ssd_training_loop_data_loader):
+        """
+        Constructor
+        :param ssd_training_loop_data_loader: net.ssd.SSDTrainingLoopDataLoader instance
+        """
+
+        self.ssd_training_loop_data_loader = ssd_training_loop_data_loader
+
+    def __len__(self):
+
+        return len(self.ssd_training_loop_data_loader)
+
+    def __iter__(self):
+
+        iterator = iter(self.ssd_training_loop_data_loader)
+
+        while True:
+
+            image, default_boxes_categories_ids_vector, default_boxes_sizes, offsets_matrix = next(iterator)
+
+            # categories predictions head needs only default_boxes_categories_ids_vector to compute loss,
+            # but offsets predictions head needs also offsets matrix and default boxes sizes.
+            # All of that data has to be rolled up into one big matrix, though
+            labels_data = {
+                "categories_predictions_head": np.array([default_boxes_categories_ids_vector]),
+                "offsets_predictions_head": np.array(
+                    [np.concatenate(
+                        [default_boxes_categories_ids_vector.reshape(-1, 1), offsets_matrix, default_boxes_sizes],
+                        axis=1)])
+            }
+
+            yield np.array([image]), labels_data
 
 
 class BaseSSDNetwork:
@@ -52,9 +87,29 @@ class BaseSSDNetwork:
             tf.concat(categories_predictions_heads_ops_list, axis=1)
 
         self.batch_of_softmax_categories_predictions_matrices_op = tf.nn.softmax(
-            self.batch_of_categories_predictions_logits_matrices_op, axis=-1)
+            logits=self.batch_of_categories_predictions_logits_matrices_op,
+            axis=-1,
+            name="categories_predictions_head")
 
-        self.batch_of_offsets_predictions_matrices_op = tf.concat(offset_predictions_heads_ops_list, axis=1)
+        self.batch_of_offsets_predictions_matrices_op = tf.concat(
+            values=offset_predictions_heads_ops_list,
+            axis=1,
+            name="offsets_predictions_head")
+
+        self.model = tf.keras.models.Model(
+            inputs=self.input_placeholder,
+            outputs={
+                "categories_predictions_head": self.batch_of_softmax_categories_predictions_matrices_op,
+                "offsets_predictions_head": self.batch_of_offsets_predictions_matrices_op
+            }
+        )
+
+        self.model.compile(
+            optimizer=tf.keras.optimizers.Adam(learning_rate=0.00001),
+            loss={
+                "categories_predictions_head": categories_predictions_loss,
+                "offsets_predictions_head": offsets_predictions_loss
+            })
 
     @staticmethod
     def get_predictions_head(input_op, categories_count, head_configuration):
@@ -107,6 +162,19 @@ class BaseSSDNetwork:
 
         raise NotImplementedError()
 
+    def predict(self, image):
+        """
+        Computes prediction on a single image
+        :param image: 3D numpy array representing an image
+        :return: 2 elements tuple,
+        (2D numpy array with softmax_predictions_matrix, 2D numpy array with offsets predictions)
+        """
+
+        images_batch_op = tf.constant(np.array([image]))
+        outputs = self.model.predict(images_batch_op)
+
+        return outputs["categories_predictions_head"][0], outputs["offsets_predictions_head"][0]
+
 
 class VGGishNetwork(BaseSSDNetwork):
     """
@@ -142,251 +210,134 @@ class VGGishNetwork(BaseSSDNetwork):
         return tensors_map
 
 
-class Resnet50ishNetwork(BaseSSDNetwork):
+def categories_predictions_loss(labels_data, predictions_data):
     """
-    SSD model based on Resnet50 network
+    SSD categories predictions loss
     """
 
-    def __init__(self, model_configuration, categories_count):
+    default_boxes_categories_ids_vector_op = tf.reshape(labels_data, shape=(-1,))
+
+    default_boxes_count = tf.shape(default_boxes_categories_ids_vector_op)[0]
+    categories_predictions_matrix = tf.reshape(predictions_data, shape=(default_boxes_count, -1))
+
+    raw_loss_op = tf.keras.backend.sparse_categorical_crossentropy(
+        target=default_boxes_categories_ids_vector_op,
+        output=categories_predictions_matrix,
+        from_logits=False,
+        axis=-1)
+
+    all_ones_op = tf.ones(shape=(default_boxes_count,), dtype=tf.float32)
+    all_zeros_op = tf.zeros(shape=(default_boxes_count,), dtype=tf.float32)
+
+    # Get a selector that's set to 1 where for all positive losses, split positive losses and negatives losses
+    positive_losses_selector_op = tf.where(
+        default_boxes_categories_ids_vector_op > 0, all_ones_op, all_zeros_op)
+
+    positive_matches_count_op = tf.cast(tf.reduce_sum(positive_losses_selector_op), tf.int32)
+
+    # Get positive losses op - that is op with losses only for default bounding boxes
+    # that were matched with ground truth annotations.
+    # First multiply raw losses with selector op, so that all negative losses will be zero.
+    # Then sort losses in descending order and select positive_matches_count elements.
+    # Thus end effect is that we select positive losses only
+    positive_losses_op = tf.sort(
+        raw_loss_op * positive_losses_selector_op, direction='DESCENDING')[:positive_matches_count_op]
+
+    hard_negatives_mining_ratio = 3
+
+    # Get negative losses op that is op with losses for default boxes that weren't matched with any ground truth
+    # annotations, or should predict background, in a similar manner as we did for positive losses.
+    # Choose x times positive matches count largest losses only for hard negatives mining
+    negative_losses_op = tf.sort(
+        raw_loss_op * (1.0 - positive_losses_selector_op),
+        direction='DESCENDING')[:(hard_negatives_mining_ratio * positive_matches_count_op)]
+
+    # If there were any positive matches at all, then return mean of both losses.
+    # Otherwise return 0 - as we can't have a mean of an empty op.
+    return tf.cond(
+        pred=positive_matches_count_op > 0,
+        true_fn=lambda: tf.math.reduce_mean(tf.concat(values=[positive_losses_op, negative_losses_op], axis=0)),
+        false_fn=lambda: tf.constant(0, dtype=tf.float32))
+
+
+def offsets_predictions_loss(labels_data, predictions_data):
+    """
+    SSD offsets predictions loss
+    """
+
+    # Each row of labels data should contain
+    # - one value for default bounding box category
+    # - four values for offsets predictions
+    # - two values for default boxes sizes
+    labels_data_matrix = tf.reshape(labels_data, shape=(-1, 7))
+
+    # Each row of predictions data should contain four values for four default box corners
+    prediction_data_matrix = tf.reshape(predictions_data, shape=(-1, 4))
+
+    # Split labels data matrix into components
+    default_boxes_categories_ids_vector_op = labels_data_matrix[:, 0]
+    ground_truth_offsets_matrix_op = labels_data_matrix[:, 1:5]
+    default_boxes_sizes_op = labels_data_matrix[:, 5:7]
+
+    default_boxes_count = tf.shape(labels_data_matrix)[0]
+
+    # Get a selector that's set to 1 where for all positive losses, split positive losses and negatives losses
+    positive_matches_selector_op = tf.where(
+        default_boxes_categories_ids_vector_op > 0,
+        tf.ones(shape=(default_boxes_count,), dtype=tf.float32),
+        tf.zeros(shape=(default_boxes_count,), dtype=tf.float32))
+
+    positive_matches_count_op = tf.cast(tf.reduce_sum(positive_matches_selector_op), tf.int32)
+
+    offsets_errors_op = ground_truth_offsets_matrix_op - prediction_data_matrix
+
+    float_boxes_sizes_op = tf.cast(default_boxes_sizes_op, tf.float32)
+
+    # Scale errors by box width for x-offsets and box height for y-offsets, so their values
+    # are roughly within <-1, 1> scale
+    scaled_offsets_errors_op = tf.stack([
+        offsets_errors_op[:, 0] / float_boxes_sizes_op[:, 0],
+        offsets_errors_op[:, 1] / float_boxes_sizes_op[:, 1],
+        offsets_errors_op[:, 2] / float_boxes_sizes_op[:, 0],
+        offsets_errors_op[:, 3] / float_boxes_sizes_op[:, 1]
+    ], axis=1)
+
+    # Square errors to get positive values, compute mean value per box
+    raw_losses_op = tf.reduce_mean(tf.math.pow(scaled_offsets_errors_op, 2), axis=1)
+
+    # Multiply by matches selector, so that we only compute loss at default boxes that matched ground truth
+    # annotations, then select all these losses
+    positive_losses_op = tf.sort(
+        raw_losses_op * positive_matches_selector_op, direction='DESCENDING')[:positive_matches_count_op]
+
+    # And finally return mean value of positives losses, or 0 if there were none
+    return tf.cond(
+        pred=positive_matches_count_op > 0,
+        true_fn=lambda: tf.reduce_mean(positive_losses_op),
+        false_fn=lambda: tf.constant(0, dtype=tf.float32))
+
+
+class HistoryLogger(tf.keras.callbacks.Callback):
+    """
+    Callback that training history
+    """
+
+    def __init__(self, logger):
         """
         Constructor
-        :param model_configuration: dictionary with model configuration
-        :param categories_count: number of categories to predict, including background
+        :param logger: logging.Logger instance
         """
 
-        super().__init__(
-            model_configuration=model_configuration,
-            categories_count=categories_count
-        )
+        super().__init__()
 
-    def get_base_layers_tensors_map(self):
+        self.logger = logger
+
+    def on_epoch_end(self, epoch, logs=None):
         """
-        Implementation of hook for base layers tensors.
-        Provides an input placeholder tensor and tensors for bases of prediction heads
-        :return: dictionary
+        Callback called on epoch end
         """
 
-        network = tf.keras.applications.ResNet50(include_top=False)
+        local_logs = copy.deepcopy(logs)
+        local_logs["epoch"] = epoch
 
-        tensors_map = {prediction_head: network.get_layer(prediction_head).output
-                       for prediction_head in self.model_configuration["prediction_heads_order"]}
-
-        tensors_map["input_placeholder"] = network.input
-
-        return tensors_map
-
-
-class SSDModel:
-    """
-    Class that wraps SSD network to provide training and prediction methods
-    """
-
-    def __init__(self, session, network):
-        """
-        Constructor
-        :param session: tensorflow.Session instance
-        :param network: SSD model network instance
-        """
-
-        self.session = session
-        self.network = network
-        self.should_continue_training = None
-        self.learning_rate = None
-
-        self.ops_map = {
-            "default_boxes_categories_ids_vector_placeholder": tf.placeholder(
-                dtype=tf.int32, shape=(None,), name="boxes_categories_placeholder"),
-            "learning_rate_placeholder": tf.placeholder(
-                shape=None, dtype=tf.float32, name="learning_rate_placeholder"),
-            "batch_of_categories_predictions_logits_matrices_op":
-                self.network.batch_of_categories_predictions_logits_matrices_op,
-            "default_boxes_sizes_op": tf.placeholder(
-                shape=(None, 2), dtype=tf.int32, name="boxes_sizes_placeholder"),
-            "ground_truth_offsets_matrix_op": tf.placeholder(
-                shape=(None, 4), dtype=tf.float32, name="ground_truth_offsets_placeholder"),
-            "batch_of_offsets_predictions_matrices_op": self.network.batch_of_offsets_predictions_matrices_op
-        }
-
-        losses_ops = self._get_losses_ops(ops_map=self.ops_map)
-
-        self.ops_map["loss_op"] = losses_ops[0]
-        self.ops_map["categorical_loss_op"] = losses_ops[1]
-        self.ops_map["offsets_loss_op"] = losses_ops[2]
-
-        self.ops_map["train_op"] = tf.train.AdamOptimizer(
-            learning_rate=self.ops_map["learning_rate_placeholder"]).minimize(self.ops_map["loss_op"])
-
-    def train(self, data_bunch, configuration, callbacks):
-        """
-        Method for training network
-        :param data_bunch: net.data.DataBunch instance created with SSD input data loaders
-        :param configuration: dictionary with training options
-        :param callbacks: list of net.Callback instances. Used to save weights, control learning rate, etc.
-        """
-
-        self.learning_rate = configuration["learning_rate"]
-        self.should_continue_training = True
-        epoch_index = 0
-
-        training_data_generator = iter(data_bunch.training_data_loader)
-        validation_data_generator = iter(data_bunch.validation_data_loader)
-
-        for callback in callbacks:
-            callback.model = self
-
-        try:
-
-            while epoch_index < configuration["epochs"] and self.should_continue_training is True:
-
-                print("Epoch {}/{}".format(epoch_index, configuration["epochs"]))
-
-                epoch_log = {
-                    "epoch_index": epoch_index,
-                    "training_losses_map": self._train_for_one_epoch(
-                        data_generator=training_data_generator,
-                        samples_count=len(data_bunch.training_data_loader)),
-                    "validation_losses_map": self._validate_for_one_epoch(
-                        data_generator=validation_data_generator,
-                        samples_count=len(data_bunch.validation_data_loader))
-                }
-
-                pprint.pprint(epoch_log)
-
-                for callback in callbacks:
-                    callback.on_epoch_end(epoch_log)
-
-                epoch_index += 1
-
-        finally:
-
-            # Stop data generators, since they are running on a separate thread
-            data_bunch.training_data_loader.stop_generator()
-            data_bunch.validation_data_loader.stop_generator()
-
-    def _train_for_one_epoch(self, data_generator, samples_count):
-
-        losses_map = {
-            "total": [],
-            "categorical": [],
-            "offset": []
-        }
-
-        for _ in tqdm.tqdm(range(samples_count)):
-
-            image, default_boxes_categories_ids_vector, default_boxes_sizes, ground_truth_offsets = \
-                next(data_generator)
-
-            feed_dictionary = {
-                self.network.input_placeholder: np.array([image]),
-                self.ops_map["default_boxes_categories_ids_vector_placeholder"]: default_boxes_categories_ids_vector,
-                self.ops_map["learning_rate_placeholder"]: self.learning_rate,
-                self.ops_map["default_boxes_sizes_op"]: default_boxes_sizes,
-                self.ops_map["ground_truth_offsets_matrix_op"]: ground_truth_offsets
-            }
-
-            total_loss, categorical_loss, offsets_loss, _ = self.session.run(
-                [self.ops_map["loss_op"], self.ops_map["categorical_loss_op"], self.ops_map["offsets_loss_op"],
-                 self.ops_map["train_op"]], feed_dictionary)
-
-            losses_map["total"].append(total_loss)
-            losses_map["categorical"].append(categorical_loss)
-            losses_map["offset"].append(offsets_loss)
-
-        return {key: np.mean(value) for key, value in losses_map.items()}
-
-    def _validate_for_one_epoch(self, data_generator, samples_count):
-
-        losses_map = {
-            "total": [],
-            "categorical": [],
-            "offset": []
-        }
-
-        for _ in tqdm.tqdm(range(samples_count)):
-
-            image, default_boxes_categories_ids_vector, default_boxes_sizes, ground_truth_offsets = \
-                next(data_generator)
-
-            feed_dictionary = {
-                self.network.input_placeholder: np.array([image]),
-                self.ops_map["default_boxes_categories_ids_vector_placeholder"]: default_boxes_categories_ids_vector,
-                self.ops_map["learning_rate_placeholder"]: self.learning_rate,
-                self.ops_map["default_boxes_sizes_op"]: default_boxes_sizes,
-                self.ops_map["ground_truth_offsets_matrix_op"]: ground_truth_offsets
-            }
-
-            total_loss, categorical_loss, offsets_loss = self.session.run(
-                [self.ops_map["loss_op"], self.ops_map["categorical_loss_op"], self.ops_map["offsets_loss_op"]],
-                feed_dictionary)
-
-            losses_map["total"].append(total_loss)
-            losses_map["categorical"].append(categorical_loss)
-            losses_map["offset"].append(offsets_loss)
-
-        return {key: np.mean(value) for key, value in losses_map.items()}
-
-    @staticmethod
-    def _get_losses_ops(ops_map):
-
-        # First flatten out batch dimension for batch_of_predictions_logits_matrices_op
-        # Its batch dimension should be 1, we would like tensorflow to raise an exception if it isn't
-
-        batch_of_categories_predictions_logits_matrices_shape = \
-            tf.shape(ops_map["batch_of_categories_predictions_logits_matrices_op"])
-
-        default_boxes_count = batch_of_categories_predictions_logits_matrices_shape[1]
-        categories_count = batch_of_categories_predictions_logits_matrices_shape[2]
-
-        categories_predictions_logits_matrix = tf.reshape(
-            ops_map["batch_of_categories_predictions_logits_matrices_op"],
-            shape=(default_boxes_count, categories_count))
-
-        offsets_predictions_matrix_op = tf.reshape(
-            ops_map["batch_of_offsets_predictions_matrices_op"],
-            shape=(default_boxes_count, 4))
-
-        losses_builder = net.ssd.SingleShotDetectorLossBuilder(
-            default_boxes_categories_ids_vector_op=ops_map["default_boxes_categories_ids_vector_placeholder"],
-            categories_predictions_logits_matrix_op=categories_predictions_logits_matrix,
-            hard_negatives_mining_ratio=3,
-            default_boxes_sizes_op=ops_map["default_boxes_sizes_op"],
-            ground_truth_offsets_matrix_op=ops_map["ground_truth_offsets_matrix_op"],
-            offsets_predictions_matrix_op=offsets_predictions_matrix_op)
-
-        return losses_builder.loss_op, losses_builder.categorical_loss_op, losses_builder.offsets_loss_op
-
-    def save(self, save_path):
-        """
-        Save model's network
-        :param save_path: prefix for filenames created for the checkpoint
-        """
-
-        os.makedirs(os.path.dirname(save_path), exist_ok=True)
-        tf.train.Saver().save(self.session, save_path)
-
-    def load(self, save_path):
-        """
-        Save model's network
-        :param save_path: prefix for filenames created for the checkpoint
-        """
-
-        tf.train.Saver().restore(self.session, save_path)
-
-    def predict(self, image):
-        """
-        Computes prediction on a single image
-        :param image: 3D numpy array representing an image
-        :return: 2 elements tuple,
-        (2D numpy array with softmax_predictions_matrix, 2D numpy array with offsets predictions)
-        """
-
-        feed_dictionary = {
-            self.network.input_placeholder: np.array([image])
-        }
-
-        categorical_predictions_batches, offsets_predictions_batches = self.session.run(
-            [self.network.batch_of_softmax_categories_predictions_matrices_op,
-             self.network.batch_of_offsets_predictions_matrices_op],
-            feed_dictionary)
-
-        return categorical_predictions_batches[0], offsets_predictions_batches[0]
+        self.logger.info(local_logs)
