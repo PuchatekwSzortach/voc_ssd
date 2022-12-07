@@ -160,7 +160,7 @@ def log_predictions(_context, config_path):
     import net.data
     import net.logging
     import net.ssd
-    import net.tf2
+    import net.ml
     import net.utilities
 
     with open(config_path, encoding="utf-8") as file:
@@ -168,7 +168,7 @@ def log_predictions(_context, config_path):
 
     logger = net.utilities.get_logger(config["log_path"])
 
-    network = net.tf2.VGGishNetwork(
+    network = net.ml.VGGishNetwork(
         model_configuration=config["vggish_model_configuration"],
         categories_count=len(config["categories"]))
 
@@ -209,7 +209,7 @@ def log_debugging_info(_context, config_path):
     import net.data
     import net.logging
     import net.ssd
-    import net.tf2
+    import net.ml
     import net.utilities
 
     with open(config_path, encoding="utf-8") as file:
@@ -217,7 +217,7 @@ def log_debugging_info(_context, config_path):
 
     logger = net.utilities.get_logger(config["log_path"])
 
-    network = net.tf2.VGGishNetwork(
+    network = net.ml.VGGishNetwork(
         model_configuration=config["vggish_model_configuration"],
         categories_count=len(config["categories"]))
 

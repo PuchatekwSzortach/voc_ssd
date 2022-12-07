@@ -20,7 +20,7 @@ def train_object_detection_model(_context, config_path):
 
     import net.data
     import net.ssd
-    import net.tf2
+    import net.ml
 
     with open(config_path, encoding="utf-8") as file:
         config = yaml.safe_load(file)
@@ -38,7 +38,7 @@ def train_object_detection_model(_context, config_path):
         voc_samples_data_loader=training_samples_loader,
         ssd_model_configuration=ssd_model_configuration)
 
-    t2_training_samples_loader = net.tf2.TF2TrainingLoopDataLoader(
+    t2_training_samples_loader = net.ml.TF2TrainingLoopDataLoader(
         ssd_training_loop_data_loader=ssd_training_samples_training_data_loader
     )
 
@@ -53,11 +53,11 @@ def train_object_detection_model(_context, config_path):
         voc_samples_data_loader=validation_samples_loader,
         ssd_model_configuration=ssd_model_configuration)
 
-    t2_validation_samples_loader = net.tf2.TF2TrainingLoopDataLoader(
+    t2_validation_samples_loader = net.ml.TF2TrainingLoopDataLoader(
         ssd_training_loop_data_loader=ssd_training_samples_validation_data_loader
     )
 
-    network = net.tf2.VGGishNetwork(
+    network = net.ml.VGGishNetwork(
         model_configuration=ssd_model_configuration,
         categories_count=len(config["categories"]))
 
@@ -74,7 +74,7 @@ def train_object_detection_model(_context, config_path):
             patience=config["train"]["reduce_learning_rate_patience"],
             factor=config["train"]["reduce_learning_rate_factor"],
             verbose=1),
-        net.tf2.HistoryLogger(
+        net.ml.HistoryLogger(
             logger=net.utilities.get_logger(config["training_history_log_path"])
         )
     ]

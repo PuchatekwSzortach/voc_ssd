@@ -336,54 +336,6 @@ class PredictionsComputer:
         return predictions
 
 
-def get_single_shot_detector_loss_op(
-        default_boxes_categories_ids_vector_op, predictions_logits_matrix_op, hard_negatives_mining_ratio):
-    """
-    Function to create single shot detector loss op
-    :param default_boxes_categories_ids_vector_op: tensorflow tensor with shape (None,) and int type
-    :param predictions_logits_matrix_op: tensorflow tensor with shape (None, None) and float type
-    :param hard_negatives_mining_ratio: int - specifies ratio of hard negatives to positive samples loss op
-    should use
-    :return: scalar loss op
-    """
-
-    default_boxes_count = tf.shape(default_boxes_categories_ids_vector_op)[0]
-
-    raw_loss_op = tf.nn.sparse_softmax_cross_entropy_with_logits(
-        labels=default_boxes_categories_ids_vector_op, logits=predictions_logits_matrix_op)
-
-    all_ones_op = tf.ones(shape=(default_boxes_count,), dtype=tf.float32)
-    all_zeros_op = tf.zeros(shape=(default_boxes_count,), dtype=tf.float32)
-
-    # Get a selector that's set to 1 where for all positive losses, split positive losses and negatives losses
-    positive_losses_selector_op = tf.where(
-        default_boxes_categories_ids_vector_op > 0, all_ones_op, all_zeros_op)
-
-    positive_matches_count_op = tf.cast(tf.reduce_sum(positive_losses_selector_op), tf.int32)
-
-    # Get positive losses op - that is op with losses only for default bounding boxes
-    # that were matched with ground truth annotations.
-    # First multiply raw losses with selector op, so that all negative losses will be zero.
-    # Then sort losses in descending order and select positive_matches_count elements.
-    # Thus end effect is that we select positive losses only
-    positive_losses_op = tf.sort(
-        raw_loss_op * positive_losses_selector_op, direction='DESCENDING')[:positive_matches_count_op]
-
-    # Get negative losses op that is op with losses for default boxes that weren't matched with any ground truth
-    # annotations, or should predict background, in a similar manner as we did for positive losses.
-    # Choose x times positive matches count largest losses only for hard negatives mining
-    negative_losses_op = tf.sort(
-        raw_loss_op * (1.0 - positive_losses_selector_op),
-        direction='DESCENDING')[:(hard_negatives_mining_ratio * positive_matches_count_op)]
-
-    # If there were any positive matches at all, then return mean of both losses.
-    # Otherwise return 0 - as we can't have a mean of an empty op.
-    return tf.cond(
-        pred=positive_matches_count_op > 0,
-        true_fn=lambda: tf.math.reduce_mean(tf.concat(values=[positive_losses_op, negative_losses_op], axis=0)),
-        false_fn=lambda: tf.constant(0, dtype=tf.float32))
-
-
 class SingleShotDetectorLossBuilder:
     """
     Class for building SSD loss op
