@@ -522,6 +522,8 @@ def get_detections_after_soft_non_maximum_suppression(detections, sigma, score_t
     # x_min, y_min, x_max, y_max, score, area
     detections = np.concatenate([detections, areas.reshape(-1, 1)], axis=1)
 
+    areas_index = detections.shape[1] - 1
+
     retained_detections = []
 
     while detections.size > 0:
@@ -544,7 +546,8 @@ def get_detections_after_soft_non_maximum_suppression(detections, sigma, score_t
         overlap_height = np.maximum(max_y - min_y + 1, 0.0)
 
         intersection_area = overlap_width * overlap_height
-        intersection_over_union = intersection_area / (detections[0, 5] + detections[1:, 5] - intersection_area)
+        intersection_over_union = \
+            intersection_area / (detections[0, areas_index] + detections[1:, areas_index] - intersection_area)
 
         # Update detections scores for all detections other than max score - we don't want to affect its score.
         # Scores are updated using an exponential function such that detections that have no intersection with top
