@@ -2,7 +2,7 @@
 FROM tensorflow/tensorflow:2.9.1-gpu
 
 # Install a few necessary need or useful libs and apps
-RUN apt update && apt install -y libcairo2-dev wget libgl1
+RUN apt update && apt install -y git libcairo2-dev wget libgl1
 
 # Download base tensorflow models
 RUN mkdir -p /root/.keras/models && \
