@@ -3,7 +3,7 @@ common_parameters:
   logging_output_directory_on_host: "/tmp/voc_ssd"
 
 voc:
-  data_directory: "../../data/VOC2012"
+  data_directory: "/data/VOC2012"
   train_set_path: "ImageSets/Main/train.txt"
   validation_set_path: "ImageSets/Main/val.txt"
   train_and_validation_set_path: "ImageSets/Main/trainval.txt"
@@ -45,20 +45,20 @@ vggish_model_configuration:
   prediction_heads_order: ["block2_pool", "block3_pool", "block4_pool", "block5_pool"]
   block2_pool:
     image_downscale_factor: 4
-    base_bounding_box_sizes: [20, 25]
+    base_bounding_box_sizes: [25]
     aspect_ratios: [0.6, 0.8, 1]
   block3_pool:
     image_downscale_factor: 8
-    base_bounding_box_sizes: [30, 40, 50, 60]
+    base_bounding_box_sizes: [40, 50, 60]
     aspect_ratios: [0.6, 0.8, 1]
   block4_pool:
     image_downscale_factor: 16
     base_bounding_box_sizes: [80, 100, 120]
-    aspect_ratios: [0.4, 0.6, 0.8, 1]
+    aspect_ratios: [0.6, 0.8, 1]
   block5_pool:
     image_downscale_factor: 32
     base_bounding_box_sizes: [150, 200, 300, 400, 500]
-    aspect_ratios: [0.4, 0.6, 0.8, 1]
+    aspect_ratios: [0.6, 0.8, 1]
 
 
 resnetish_model_configuration:
@@ -88,5 +88,5 @@ train:
   reduce_learning_rate_patience: 2
   reduce_learning_rate_factor: 0.1
 
-model_checkpoint_path: "../../data/voc_ssd_models/current_model/"
-best_model_checkpoint_path: "../../data/voc_ssd_models/current_model/"
+model_checkpoint_path: "/data/voc_ssd_models/current_model.weights.h5"
+best_model_checkpoint_path: "/data/voc_ssd_models/current_model/"

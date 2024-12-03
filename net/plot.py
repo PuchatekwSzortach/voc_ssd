@@ -22,15 +22,18 @@ def draw_annotation_label(pil_image, annotation, color, font):
 
     draw_manager = PIL.ImageDraw.Draw(pil_image)
 
-    text_size = draw_manager.textsize(annotation.label, font)
+    dummy_text_box = draw_manager.textbbox((0, 0), annotation.label, font)
+
+    text_width = dummy_text_box[2] - dummy_text_box[0]
+    text_height = dummy_text_box[3] - dummy_text_box[1]
 
     box_left = int(max(0, np.floor(annotation.bounding_box[0] + 0.5)))
     box_top = int(max(0, np.floor(annotation.bounding_box[1] + 0.5)))
 
-    text_origin = [box_left, box_top - text_size[1]] \
-        if box_top - text_size[1] >= 0 else [box_left, box_top + 1]
+    text_origin = [box_left, box_top - text_height] \
+        if box_top - text_height >= 0 else [box_left, box_top + 1]
 
-    text_end = text_origin[0] + text_size[0], text_origin[1] + text_size[1]
+    text_end = text_origin[0] + text_width, text_origin[1] + text_height
     text_box = text_origin[0], text_origin[1], text_end[0], text_end[1]
 
     draw_manager.rectangle(text_box, fill=tuple(color))

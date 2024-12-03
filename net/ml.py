@@ -83,18 +83,14 @@ class BaseSSDNetwork:
             categories_predictions_heads_ops_list.append(categories_predictions_head)
             offset_predictions_heads_ops_list.append(offsets_predictions_head)
 
-        self.batch_of_categories_predictions_logits_matrices_op = \
-            tf.concat(categories_predictions_heads_ops_list, axis=1)
+        self.batch_of_categories_predictions_logits_matrices_op = tf.keras.layers.Concatenate(
+            axis=1, name="categories_prediction_logits_head")(categories_predictions_heads_ops_list)
 
-        self.batch_of_softmax_categories_predictions_matrices_op = tf.nn.softmax(
-            logits=self.batch_of_categories_predictions_logits_matrices_op,
-            axis=-1,
-            name="categories_predictions_head")
+        self.batch_of_softmax_categories_predictions_matrices_op = tf.keras.layers.Softmax(
+            axis=-1, name="categories_predictions_head")(self.batch_of_categories_predictions_logits_matrices_op)
 
-        self.batch_of_offsets_predictions_matrices_op = tf.concat(
-            values=offset_predictions_heads_ops_list,
-            axis=1,
-            name="offsets_predictions_head")
+        self.batch_of_offsets_predictions_matrices_op = tf.keras.layers.Concatenate(
+            axis=1, name="offsets_predictions_head")(offset_predictions_heads_ops_list)
 
         self.model = tf.keras.models.Model(
             inputs=self.input_placeholder,
@@ -144,13 +140,9 @@ class BaseSSDNetwork:
         offsets_predictions_op = tf.keras.layers.Conv2D(
             filters=4 * default_boxes_count, kernel_size=(3, 3), padding='same')(x)
 
-        # Reshape outputs to 3D matrices (batch_dimension, default boxes on all pixel locations, x), where
-        # x is categories_count for categories logits predictions op and 4 for offsets predictions op
         return \
-            tf.reshape(categories_logits_predictions_op,
-                       shape=(tf.shape(categories_logits_predictions_op)[0], -1, categories_count)), \
-            tf.reshape(offsets_predictions_op,
-                       shape=(tf.shape(offsets_predictions_op)[0], -1, 4))
+            tf.keras.layers.Reshape((-1, categories_count))(categories_logits_predictions_op), \
+            tf.keras.layers.Reshape((-1, 4))(offsets_predictions_op)
 
     def get_base_layers_tensors_map(self):
         """
