@@ -96,7 +96,3 @@ post_processing:
   non_maximum_suppression:
     method: "greedy"
     iou_threshold: 0.3
-
-    # method: "soft"
-    # score_threshold: 0.7
-    # sigma: 0.5
