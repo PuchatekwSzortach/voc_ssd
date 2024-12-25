@@ -560,6 +560,58 @@ def get_detections_after_soft_non_maximum_suppression(detections, sigma, score_t
     return np.array(retained_detections)
 
 
+def get_detections_after_greedy_non_maximum_suppression(detections, iou_threshold):
+    """
+    Args:
+        detections (numpy.array): Detection results with shape `(num, 5)`,
+            data in second dimension are [x_min, y_min, x_max, y_max, score] respectively.
+        iou_threshold (float): Boxes that have IOU greater than this value with
+            the box with the highest score will be discarded.
+    Returns:
+        numpy.array: Retained boxes.
+    """
+
+    areas = (detections[:, 2] - detections[:, 0] + 1) * (detections[:, 3] - detections[:, 1] + 1)
+    # expand detections with areas, so that the second dimension is
+    # x_min, y_min, x_max, y_max, score, area
+    detections = np.concatenate([detections, areas.reshape(-1, 1)], axis=1)
+
+    areas_index = detections.shape[1] - 1
+
+    retained_detections = []
+
+    while detections.size > 0:
+
+        # Get index for detection with max score, then swap that detection with detection at index 0.
+        # This way we will get detection with max score at index 0 in detections array
+        max_score_index = np.argmax(detections[:, 4], axis=0)
+        detections[[0, max_score_index]] = detections[[max_score_index, 0]]
+
+        # Save max score detection to retained detections
+        retained_detections.append(detections[0])
+
+        # Compute intersection over union between top score box and all other boxes
+        min_x = np.maximum(detections[0, 0], detections[1:, 0])
+        min_y = np.maximum(detections[0, 1], detections[1:, 1])
+        max_x = np.minimum(detections[0, 2], detections[1:, 2])
+        max_y = np.minimum(detections[0, 3], detections[1:, 3])
+
+        intersection_area = np.maximum(max_x - min_x + 1, 0.0) * np.maximum(max_y - min_y + 1, 0.0)
+        intersection_over_union = \
+            intersection_area / (detections[0, areas_index] + detections[1:, areas_index] - intersection_area)
+
+        # Discard detections that have IOU with top score detection above threshold.
+        # Take care to shift indices by +1 to account for fact
+        # we are leaving out top score detection at index 0
+        retained_detections_indices = np.where(intersection_over_union < iou_threshold)[0] + 1
+        detections = detections[retained_detections_indices]
+
+    if len(retained_detections) == 0:
+        return np.array([]).reshape(0, 5)
+    else:
+        return np.array(retained_detections)[:, :5]
+
+
 def get_image_padded_to_size_factor_multiple(image, size_factor):
     """
     Pad image so its width and height are a multiple of size_factor.

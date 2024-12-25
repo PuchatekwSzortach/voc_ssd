@@ -154,6 +154,7 @@ def log_predictions(_context, config_path):
         config_path (str): path to configuration file
     """
 
+    import box
     import tqdm
     import yaml
 
@@ -164,7 +165,7 @@ def log_predictions(_context, config_path):
     import net.utilities
 
     with open(config_path, encoding="utf-8") as file:
-        config = yaml.safe_load(file)
+        config = box.Box(yaml.safe_load(file))
 
     logger = net.utilities.get_logger(config["log_path"])
 

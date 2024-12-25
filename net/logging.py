@@ -76,8 +76,8 @@ def log_single_prediction(logger, model, default_boxes_factory, samples_iterator
 
     predictions_with_nms = net.ssd.PredictionsComputer(
         categories=config["categories"],
-        threshold=0.5,
-        use_non_maximum_suppression=True).get_predictions(
+        confidence_threshold=0.5,
+        post_processing_config=config.post_processing).get_predictions(
             bounding_boxes_matrix=default_boxes_matrix + offsets_predictions_matrix,
             softmax_predictions_matrix=softmax_predictions_matrix)
 
@@ -163,8 +163,8 @@ def log_single_sample_debugging_info(
     # Get annotations boxes and labels from predictions matrix and default boxes matrix
     predictions = net.ssd.PredictionsComputer(
         categories=config["categories"],
-        threshold=0.5,
-        use_non_maximum_suppression=False).get_predictions(
+        confidence_threshold=0.5,
+        post_processing_config=config.post_processing).get_predictions(
             bounding_boxes_matrix=default_boxes_matrix + offsets_predictions_matrix,
             softmax_predictions_matrix=softmax_predictions_matrix)
 

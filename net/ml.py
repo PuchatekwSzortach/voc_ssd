@@ -163,7 +163,7 @@ class BaseSSDNetwork:
         """
 
         images_batch_op = tf.constant(np.array([image]))
-        outputs = self.model.predict(images_batch_op)
+        outputs = self.model.predict(images_batch_op, verbose=False)
 
         return outputs["categories_predictions_head"][0], outputs["offsets_predictions_head"][0]
 

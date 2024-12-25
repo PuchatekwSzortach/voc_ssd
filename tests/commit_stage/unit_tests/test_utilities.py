@@ -462,3 +462,55 @@ def test_get_detections_after_soft_non_maximum_suppression_two_highly_overlappin
         detections=detections, sigma=0.5, score_threshold=0.5)[:, :5]
 
     assert np.all(expected == actual)
+
+
+class TestGreedyNonMaximumSuppression:
+    """
+    Tests for greedy non-maximum suppression logic
+    """
+
+    def test_with_small_box_inside_large_box(self):
+        """
+        Test greedy non-maximum suppression with a small box inside a large box
+        """
+
+        detections = np.array([
+            [5, 5, 25, 25, 0.6],
+            [10, 10, 20, 20, 0.5]
+        ])
+
+        # Boxes have small enough IOU to be considered separate
+        expected = detections
+
+        actual = net.utilities.get_detections_after_greedy_non_maximum_suppression(
+            detections=detections,
+            iou_threshold=0.5)
+
+        assert np.all(expected == actual)
+
+    def test_with_boxes_with_large_overlap(self):
+        """
+        Test greedy non-maximum suppression with a set of boxes with large overlap
+        """
+
+        detections = np.array([
+            # First set of boxes - all have high IOU with each other
+            [10, 10, 20, 20, 0.5],
+            [11, 11, 21, 21, 0.6],
+            [9, 9, 21, 21, 0.7],
+            # Second set of boxes - all have high IOU with each other
+            [96, 96, 123, 123, 0.5],
+            [94, 94, 124, 124, 0.6],
+            [95, 95, 125, 125, 0.8],
+        ])
+
+        expected = np.array([
+            [95, 95, 125, 125, 0.8],
+            [9, 9, 21, 21, 0.7]
+        ])
+
+        actual = net.utilities.get_detections_after_greedy_non_maximum_suppression(
+            detections=detections,
+            iou_threshold=0.5)
+
+        assert np.all(expected == actual)
