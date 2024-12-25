@@ -2,6 +2,7 @@
 Module with SSD-specific computations
 """
 
+import box
 import numpy as np
 import tensorflow as tf
 
@@ -99,8 +100,14 @@ class DefaultBoxesFactory:
                 half_width = width / 2
                 half_height = height / 2
 
-                box = [x_center - half_width, y_center - half_height, x_center + half_width, y_center + half_height]
-                boxes.append(box)
+                corner_box = [
+                    x_center - half_width,
+                    y_center - half_height,
+                    x_center + half_width,
+                    y_center + half_height
+                ]
+
+                boxes.append(corner_box)
 
             # Horizontal boxes
             for aspect_ratio in configuration["aspect_ratios"]:
@@ -111,8 +118,14 @@ class DefaultBoxesFactory:
                 half_width = width / 2
                 half_height = height / 2
 
-                box = [x_center - half_width, y_center - half_height, x_center + half_width, y_center + half_height]
-                boxes.append(box)
+                corner_box = [
+                    x_center - half_width,
+                    y_center - half_height,
+                    x_center + half_width,
+                    y_center + half_height
+                ]
+
+                boxes.append(corner_box)
 
         return np.array(boxes)
 
@@ -240,18 +253,18 @@ class PredictionsComputer:
     Class for computing objects predictions from predictions matrix and default boxes matrix
     """
 
-    def __init__(self, categories, threshold, use_non_maximum_suppression):
+    def __init__(self, categories, confidence_threshold, post_processing_config: box.Box):
         """
         Constructor
         :param categories: list of strings
         :param threshold: float, only non-background predictions above this threshold will be returned
-        :param use_non_maximum_suppression: bool, specifies if non maximum suppression should be used.
-        soft-nms algorithm is used for non maximum suppression.
+        :param post_processing_config: box.Box with post-processing options. Should contain key
+        "method". Other keys depend on method chosen.
         """
 
         self.categories = categories
-        self.threshold = threshold
-        self.use_non_maximum_suppression = use_non_maximum_suppression
+        self.confidence_threshold = confidence_threshold
+        self.post_processing_config = post_processing_config
 
     def get_predictions(self, bounding_boxes_matrix, softmax_predictions_matrix):
         """
@@ -262,20 +275,20 @@ class PredictionsComputer:
         :return: list of net.utilities.Prediction instances
         """
 
-        if self.use_non_maximum_suppression is True:
+        if self.post_processing_config.non_maximum_suppression.method is None:
 
-            return self._get_soft_nms_predictions(bounding_boxes_matrix, softmax_predictions_matrix)
+            return self._get_raw_predictions(bounding_boxes_matrix, softmax_predictions_matrix)
 
         else:
 
-            return self._get_raw_predictions(bounding_boxes_matrix, softmax_predictions_matrix)
+            return self._get_nms_predictions(bounding_boxes_matrix, softmax_predictions_matrix)
 
     def _get_raw_predictions(self, bounding_boxes_matrix, softmax_predictions_matrix):
 
         # Get a selector for non-background predictions over threshold
         predictions_selector = \
             (np.argmax(softmax_predictions_matrix, axis=1) > 0) & \
-            (np.max(softmax_predictions_matrix, axis=1) > self.threshold)
+            (np.max(softmax_predictions_matrix, axis=1) > self.confidence_threshold)
 
         predictions_boxes = bounding_boxes_matrix[predictions_selector]
         predictions_categories_indices = np.argmax(softmax_predictions_matrix[predictions_selector], axis=1)
@@ -283,11 +296,11 @@ class PredictionsComputer:
 
         predictions = []
 
-        for box, category_id, confidence in \
+        for prediction_box, category_id, confidence in \
                 zip(predictions_boxes, predictions_categories_indices, predictions_confidences):
 
             prediction = net.utilities.Prediction(
-                bounding_box=[int(x) for x in box],
+                bounding_box=[int(x) for x in prediction_box],
                 confidence=confidence,
                 label=self.categories[category_id],
                 category_id=category_id)
@@ -296,12 +309,12 @@ class PredictionsComputer:
 
         return predictions
 
-    def _get_soft_nms_predictions(self, default_boxes_matrix, softmax_predictions_matrix):
+    def _get_nms_predictions(self, default_boxes_matrix, softmax_predictions_matrix):
 
         # Get a selector for non-background predictions over threshold
         predictions_selector = \
             (np.argmax(softmax_predictions_matrix, axis=1) > 0) & \
-            (np.max(softmax_predictions_matrix, axis=1) > self.threshold)
+            (np.max(softmax_predictions_matrix, axis=1) > self.confidence_threshold)
 
         predictions_boxes = default_boxes_matrix[predictions_selector]
         predictions_categories_indices = np.argmax(softmax_predictions_matrix[predictions_selector], axis=1)
@@ -317,11 +330,27 @@ class PredictionsComputer:
         # soft nms works on each category separately
         for category_id in range(1, len(self.categories)):
 
-            # Perform soft-nms on detections for current category
-            retained_detections_at_current_category = net.utilities.get_detections_after_soft_non_maximum_suppression(
-                detections=detections[predictions_categories_indices == category_id],
-                sigma=0.5,
-                score_threshold=0.5)
+            if self.post_processing_config.non_maximum_suppression.method == "soft":
+
+                # Perform soft-nms on detections for current category
+                retained_detections_at_current_category = \
+                    net.utilities.get_detections_after_soft_non_maximum_suppression(
+                        detections=detections[predictions_categories_indices == category_id],
+                        sigma=self.post_processing_config.non_maximum_suppression.sigma,
+                        score_threshold=self.post_processing_config.non_maximum_suppression.score_threshold)
+
+            elif self.post_processing_config.non_maximum_suppression.method == "greedy":
+
+                retained_detections_at_current_category = \
+                    net.utilities.get_detections_after_greedy_non_maximum_suppression(
+                        detections=detections[predictions_categories_indices == category_id],
+                        iou_threshold=self.post_processing_config.non_maximum_suppression.iou_threshold)
+
+            else:
+                raise ValueError(
+                    "Unsupported non-maximum suppression method: "
+                    f"{self.post_processing_config.non_maximum_suppression.method}"
+                )
 
             for detection in retained_detections_at_current_category:
 

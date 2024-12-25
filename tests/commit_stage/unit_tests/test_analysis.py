@@ -264,3 +264,30 @@ class TestMeanAveragePrecisionComputer:
             precision_values=precision_values)
 
         assert np.allclose(expected, actual)
+
+
+def test_get_unique_prediction_matches():
+    """
+    Test for get_unique_prediction_matches function
+    """
+
+    ground_truths = [
+        net.utilities.Annotation(bounding_box=[10, 10, 100, 100], label="car"),
+        net.utilities.Annotation(bounding_box=[20, 50, 80, 120], label="dog"),
+        net.utilities.Annotation(bounding_box=[30, 50, 200, 300], label="airplane")
+    ]
+
+    predictions = [
+        net.utilities.Prediction(bounding_box=[20, 50, 80, 120], confidence=0.9, label="dog"),
+        net.utilities.Prediction(bounding_box=[20, 50, 80, 120], confidence=0.8, label="dog"),
+        net.utilities.Prediction(bounding_box=[10, 10, 100, 100], confidence=0.7, label="car")
+    ]
+
+    expected = [
+        net.utilities.Prediction(bounding_box=[20, 50, 80, 120], confidence=0.9, label="dog"),
+        net.utilities.Prediction(bounding_box=[10, 10, 100, 100], confidence=0.7, label="car")
+    ]
+
+    actual = net.analysis.get_unique_prediction_matches(ground_truths, predictions)
+
+    assert expected == actual

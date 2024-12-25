@@ -86,15 +86,13 @@ A few sample predictions on VOC 2012 dataset made with a trained model are shown
 ```
 Dataset used: VOC Pascal 2012
 Confidence threshold used: 0.5
-Recall: 0.441
-Precision: 0.764
+Recall: 0.458
+Precision: 0.723
+F1 score: 0.561
 ```
 
 #### Good prediction
 ![alt text](./images/good_prediction.png)
-
-#### Typical prediction - many objects are correctly detected, but a few are off
-![alt text](./images/typical_prediction.png)
 
 #### Bad prediction
 ![alt text](./images/bad_prediction.png)

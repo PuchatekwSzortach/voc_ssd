@@ -150,14 +150,17 @@ def analyze_objects_detections_predictions(_context, config_path):
         config_path (str): path to configurtion file
     """
 
+    import box
     import yaml
 
     import net.analysis
     import net.data
     import net.ml
+    import net.ssd
+    import net.utilities
 
     with open(config_path, encoding="utf-8") as file:
-        config = yaml.safe_load(file)
+        config = box.Box(yaml.safe_load(file))
 
         ssd_model_configuration = config["vggish_model_configuration"]
 
@@ -181,8 +184,9 @@ def analyze_objects_detections_predictions(_context, config_path):
         samples_loader=validation_samples_loader,
         model=network,
         default_boxes_factory=default_boxes_factory,
-        thresholds=[0, 0.5, 0.9],
-        categories=config["categories"]).get_thresholds_matched_data_map()
+        confidence_thresholds=[0, 0.5, 0.9],
+        categories=config["categories"],
+        post_processing_config=config.post_processing).get_thresholds_matched_data_map()
 
     net.analysis.log_precision_recall_analysis(
         logger=logger,

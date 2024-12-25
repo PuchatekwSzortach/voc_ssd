@@ -7,6 +7,7 @@ import os
 import queue
 import threading
 
+import box
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn
@@ -92,7 +93,9 @@ class MatchingDataComputer:
     Utility for computing matched and unmatched annotations and predictions at different thresholds
     """
 
-    def __init__(self, samples_loader, model, default_boxes_factory, thresholds, categories):
+    def __init__(
+            self, samples_loader, model, default_boxes_factory,
+            confidence_thresholds, categories, post_processing_config: box.Box):
         """
         Constructor
         :param samples_loader: net.data.VOCSamplesDataLoader instance
@@ -101,13 +104,15 @@ class MatchingDataComputer:
         :param thresholds: list of floats, for each threshold, only predictions with confidence above it will be used
         to compute matching data
         :param categories: list of strings, labels for categories
+        :param post_processing_config: box.Box with post processing configuration options
         """
 
         self.samples_loader = samples_loader
         self.model = model
         self.default_boxes_factory = default_boxes_factory
-        self.thresholds = thresholds
+        self.confidence_thresholds = confidence_thresholds
         self.categories = categories
+        self.post_processing_config = post_processing_config
 
     def get_thresholds_matched_data_map(self):
         """
@@ -119,7 +124,9 @@ class MatchingDataComputer:
 
         iterator = iter(self.samples_loader)
 
-        thresholds_matched_data_map = {threshold: collections.defaultdict(list) for threshold in self.thresholds}
+        thresholds_matched_data_map = {
+            threshold: collections.defaultdict(list) for threshold in self.confidence_thresholds
+        }
 
         samples_count = len(self.samples_loader)
         samples_queue = queue.Queue(maxsize=250)
@@ -163,12 +170,12 @@ class MatchingDataComputer:
             default_boxes_matrix = self.default_boxes_factory.get_default_boxes_matrix(sample_data_map["image_shape"])
 
             # Compute matching data for sample at each threshold
-            for threshold in self.thresholds:
+            for threshold in self.confidence_thresholds:
 
                 predictions = net.ssd.PredictionsComputer(
                     categories=self.categories,
-                    threshold=threshold,
-                    use_non_maximum_suppression=True).get_predictions(
+                    confidence_threshold=threshold,
+                    post_processing_config=self.post_processing_config).get_predictions(
                         bounding_boxes_matrix=default_boxes_matrix + sample_data_map["offsets_predictions_matrix"],
                         softmax_predictions_matrix=sample_data_map["softmax_predictions_matrix"])
 
@@ -199,16 +206,11 @@ class MatchingDataComputer:
 
                 matches_data["unmatched_annotations"].append(ground_truth_annotation)
 
-        # For each prediction, check if it was matched by any ground truth annotation
-        for prediction in predictions:
+        matched_predictions = get_unique_prediction_matches(ground_truth_annotations, predictions)
+        unmatched_predictions = set(predictions).difference(matched_predictions)
 
-            if is_annotation_matched(prediction, ground_truth_annotations):
-
-                matches_data["matched_predictions"].append(prediction)
-
-            else:
-
-                matches_data["unmatched_predictions"].append(prediction)
+        matches_data["matched_predictions"].extend(matched_predictions)
+        matches_data["unmatched_predictions"].extend(unmatched_predictions)
 
         matches_data["mean_average_precision_data"] = get_predictions_matches(
             ground_truth_annotations=ground_truth_annotations, predictions=predictions)
@@ -242,6 +244,11 @@ def get_precision_recall_analysis_report(
     precision = len(matched_predictions) / total_predictions_count if total_predictions_count > 0 else 0
 
     message = "Precision is {:.3f}<br>".format(precision)
+    messages.append(message)
+
+    f1_score = 2 * precision * recall / (precision + recall) if precision + recall > 0 else 0
+
+    message = "F1 score is {:.3f}<br>".format(f1_score)
     messages.append(message)
 
     return " ".join(messages)
@@ -441,9 +448,11 @@ def get_predictions_matches(ground_truth_annotations, predictions):
 
         if len(unmatched_ground_truth_annotations_list) > 0:
 
-            # Get a boolean vector checking if prediction the same label as any ground truth annotations
-            categories_matches_vector = [ground_truth_annotation.label == prediction.label
-                                         for ground_truth_annotation in unmatched_ground_truth_annotations_list]
+            # Get a boolean vector checking if prediction has the same label as any ground truth annotations
+            categories_matches_vector = [
+                ground_truth_annotation.label == prediction.label
+                for ground_truth_annotation in unmatched_ground_truth_annotations_list
+            ]
 
             annotations_bounding_boxes = np.array([
                 ground_truth_annotation.bounding_box
@@ -484,6 +493,70 @@ def get_predictions_matches(ground_truth_annotations, predictions):
             )
 
     return matches_data
+
+
+def get_unique_prediction_matches(ground_truth_annotations, predictions):
+    """
+    Get a list of unique predictions for ground truth annotations.
+    If multiple predictions match the same ground truth annotation, only the one with the highest confidence is
+    included in the list.
+
+    Args:
+        ground_truth_annotations (list[net.utilities.Annotation]): ground truth annotations
+        predictions (list[net.utilities.Prediction]): predictions
+
+    Returns:
+        list[net.utilities.Prediction]: unique predictions that matched ground truth annotations
+    """
+
+    # Sort predictions by confidence in descending order
+    sorted_predictions = sorted(predictions, key=lambda x: x.confidence, reverse=True)
+
+    # Set of ground truth annotations that weren't matched with any prediction yet
+    unmatched_ground_truth_annotations = set(ground_truth_annotations)
+
+    unique_predictions = []
+
+    for prediction in sorted_predictions:
+
+        # Convert set of unmatched ground truth annotations to a list, so we can work with its indices
+        unmatched_ground_truth_annotations_list = list(unmatched_ground_truth_annotations)
+
+        if len(unmatched_ground_truth_annotations_list) > 0:
+
+            # Get a boolean vector checking if prediction has the same label as any ground truth annotations
+            categories_matches_vector = [
+                ground_truth_annotation.label == prediction.label
+                for ground_truth_annotation in unmatched_ground_truth_annotations_list
+            ]
+
+            annotations_bounding_boxes = np.array([
+                ground_truth_annotation.bounding_box
+                for ground_truth_annotation in unmatched_ground_truth_annotations_list
+            ])
+
+            # Return indices of ground truth annotation's boxes that have high intersection over union with
+            # prediction's box
+            matched_boxes_indices = net.utilities.get_matched_boxes_indices(
+                prediction.bounding_box, annotations_bounding_boxes, threshold=0.5)
+
+            # Create boxes matches vector
+            boxes_matches_vector = np.zeros_like(categories_matches_vector)
+            boxes_matches_vector[matched_boxes_indices] = True
+
+            # Create matches vector by doing logical and on categories and boxes vectors
+            matches_flags_vector = np.logical_and(categories_matches_vector, boxes_matches_vector)
+
+            # Record match data for the prediction
+            if np.any(matches_flags_vector):
+
+                # Remove matched ground truth annotations from unmatched ground truth annotations set
+                unmatched_ground_truth_annotations = unmatched_ground_truth_annotations.difference(
+                    np.array(unmatched_ground_truth_annotations_list)[matches_flags_vector])
+
+                unique_predictions.append(prediction)
+
+    return unique_predictions
 
 
 def log_mean_average_precision_analysis(logger, thresholds_matching_data_map):
